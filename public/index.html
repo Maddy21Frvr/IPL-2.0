@@ -1048,6 +1048,16 @@ function handleServerMsg(msg){
       }
       break;
 
+    case 'COOLDOWN_START':
+      cooldown.globalUntil = Date.now() + msg.globalMs;
+      cooldown.playerUntil[msg.bidderTeam] = Date.now() + msg.playerMs;
+      showCooldownBar(msg.globalMs);
+      break;
+
+    case 'GOING_ONCE':  showGoingMsg('🔨 Going once…'); break;
+    case 'GOING_TWICE': showGoingMsg('🔨🔨 Going twice…'); break;
+    case 'GOING_THREE': showGoingMsg('🔨🔨🔨 Going three times…'); break;
+
     case 'WAR_UPDATE':
       war.teamA=msg.teamA||null; war.teamB=msg.teamB||null;
       war.waiter=msg.waiter||null; war.active=!!(msg.teamA&&msg.teamB);
@@ -1501,6 +1511,27 @@ function startTimer(){
     if(!state.timerRunning){clearTimer();return;}
     state.timerSecs--; updateTimerUI();
     relay('TIMER_TICK',{secs:state.timerSecs});
+
+    // ── Final phase drama ──────────────────────────────────────
+    if(state.currentBidder){
+      if(state.timerSecs===5){
+        relay('GOING_ONCE',{});
+        showGoingMsg('🔨 Going once…');
+        // Shorten global cooldown in final phase to allow last-second bids
+        cooldown.globalUntil = Math.min(cooldown.globalUntil, Date.now()+500);
+      }
+      if(state.timerSecs===3){
+        relay('GOING_TWICE',{});
+        showGoingMsg('🔨🔨 Going twice…');
+        cooldown.globalUntil = Math.min(cooldown.globalUntil, Date.now()+300);
+      }
+      if(state.timerSecs===1){
+        relay('GOING_THREE',{});
+        showGoingMsg('🔨🔨🔨 Going three times…');
+      }
+    }
+    // ──────────────────────────────────────────────────────────
+
     if(state.timerSecs<=0){
       clearTimer();
       if(state.currentBidder) hammer(); else markUnsold();
@@ -1637,6 +1668,8 @@ function resetWithdrawals(){
   clearWarTimer();
   war.teamA=null; war.teamB=null; war.waiter=null; war.active=false;
   updateWarBanner(null,null,null,0);
+  resetCooldowns();
+  const gm=document.getElementById('going-msg'); if(gm) gm.style.opacity='0';
   updateMyBidVal();
 }
 
@@ -1663,6 +1696,129 @@ function updateWarBanner(teamA, teamB, waiter, secs){
   el.innerHTML=`⚔️ WAR: ${tW.flag}<b style="color:var(--gold)">${waiter}</b> bids &nbsp;→&nbsp; ${tR.flag}<b style="color:var(--red)">${responder}</b> <span style="color:${secs<=3?'var(--red)':secs<=5?'var(--gold)':'var(--text)'}">${secs}s</span> &nbsp;|&nbsp; <span style="color:var(--muted);font-size:.65rem">LOCKED: others wait</span>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// COOLDOWN SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+const cooldown = {
+  globalUntil:   0,   // timestamp: no bids from anyone until this time
+  playerUntil:   {},  // teamId -> timestamp: that team's personal cooldown
+  globalTimer:   null,
+  playerTimers:  {},
+};
+
+// Get dynamic cooldown based on current bid value (higher stakes = longer pause)
+function getGlobalCooldown(){
+  const bid = state.currentBid;
+  if(bid >= 1000) return 2500;   // ₹10Cr+ — high stakes, 2.5s
+  if(bid >= 500)  return 2000;   // ₹5Cr+  — mid-high, 2s
+  if(bid >= 200)  return 1500;   // ₹2Cr+  — mid, 1.5s
+  return 1000;                    // early stage — 1s
+}
+
+function getPlayerCooldown(){
+  return 1500; // 1.5s personal cooldown after your own bid
+}
+
+// Called after every bid lands — start both cooldowns
+function triggerCooldowns(bidderTeam){
+  const now = Date.now();
+  const globalMs = getGlobalCooldown();
+  const playerMs = getPlayerCooldown();
+
+  cooldown.globalUntil = now + globalMs;
+  cooldown.playerUntil[bidderTeam] = now + playerMs;
+
+  // Relay cooldown info so non-host clients show the indicator too
+  relay('COOLDOWN_START',{globalMs, bidderTeam, playerMs});
+  showCooldownBar(globalMs);
+}
+
+// Check if global cooldown is still active
+function isGlobalCooldownActive(){
+  return Date.now() < cooldown.globalUntil;
+}
+
+// Check if a specific team's personal cooldown is active
+function isPlayerCooldownActive(teamId){
+  return Date.now() < (cooldown.playerUntil[teamId]||0);
+}
+
+// Reset all cooldowns (e.g. when new player comes on stage)
+function resetCooldowns(){
+  cooldown.globalUntil = 0;
+  cooldown.playerUntil = {};
+  clearTimeout(cooldown.globalTimer);
+  hideCooldownBar();
+}
+
+// ── Cooldown bar UI ──────────────────────────────────────────────
+function showCooldownBar(durationMs){
+  let bar = document.getElementById('cooldown-bar');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'cooldown-bar';
+    bar.style.cssText = `
+      position:absolute;bottom:0;left:0;right:0;height:3px;
+      background:var(--border);overflow:hidden;z-index:20;pointer-events:none;
+    `;
+    bar.innerHTML = '<div id="cooldown-fill" style="height:100%;width:100%;background:linear-gradient(90deg,var(--accent),var(--gold));transition:none;transform-origin:left"></div>';
+    document.getElementById('bid-controls')?.appendChild(bar);
+  }
+  const fill = document.getElementById('cooldown-fill');
+  if(!fill) return;
+  // Animate shrink from 100% to 0% over durationMs
+  fill.style.transition = 'none';
+  fill.style.width = '100%';
+  requestAnimationFrame(()=>{
+    fill.style.transition = `width ${durationMs}ms linear`;
+    fill.style.width = '0%';
+  });
+  // Also briefly disable bid button visually
+  updateCooldownBtn(true);
+  clearTimeout(cooldown.globalTimer);
+  cooldown.globalTimer = setTimeout(()=>{
+    hideCooldownBar();
+    updateCooldownBtn(false);
+  }, durationMs);
+}
+
+function hideCooldownBar(){
+  const fill = document.getElementById('cooldown-fill');
+  if(fill){ fill.style.transition='none'; fill.style.width='0%'; }
+  updateCooldownBtn(false);
+}
+
+// ── "Going once / twice / three times" drama UI ──────────────────
+let _goingTimer=null;
+function showGoingMsg(msg){
+  let el=document.getElementById('going-msg');
+  if(!el){
+    el=document.createElement('div');
+    el.id='going-msg';
+    el.style.cssText='position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:20;font-family:"Bebas Neue",cursive;font-size:1.6rem;letter-spacing:3px;color:var(--gold);text-shadow:0 0 20px rgba(245,200,66,.6);pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap;';
+    document.getElementById('auction-stage')?.appendChild(el);
+  }
+  el.textContent=msg;
+  el.style.opacity='1';
+  clearTimeout(_goingTimer);
+  _goingTimer=setTimeout(()=>{ if(el) el.style.opacity='0'; },2000);
+}
+
+// Flash the bid button during cooldown if player tries to bid
+function updateCooldownBtn(cooling){
+  // Only flash if not already locked by war system
+  if(warLocked()) return;
+  const bb = document.getElementById('place-bid-btn');
+  if(!bb) return;
+  if(cooling){
+    bb.style.opacity = '0.55';
+    bb.title = 'Cooldown — wait a moment';
+  } else {
+    bb.style.opacity = '';
+    bb.title = '';
+  }
+}
+
 function placeBid(){
   if(!state.isBidder){showToast('Spectating','You cannot bid while spectating');return;}
   if(state.currentPlayerIdx<0) return;
@@ -1681,6 +1837,22 @@ function placeBid(){
       return;
     }
     // state.myTeam === warResponder() → fall through, it IS your turn
+  }
+  // ─────────────────────────────────────────────────────────────────
+
+  // ── COOLDOWN CHECKS ───────────────────────────────────────────────
+  if(isGlobalCooldownActive()){
+    const remaining = Math.ceil((cooldown.globalUntil - Date.now())/1000);
+    showToast('⏳ Cooldown',`Wait ${remaining}s — bids just happened`);
+    // Flash the bar to draw attention
+    const fill=document.getElementById('cooldown-fill');
+    if(fill){fill.style.background='var(--red)';setTimeout(()=>{if(fill)fill.style.background='linear-gradient(90deg,var(--accent),var(--gold))';},300);}
+    return;
+  }
+  if(isPlayerCooldownActive(state.myTeam)){
+    const remaining = Math.ceil((cooldown.playerUntil[state.myTeam] - Date.now())/1000);
+    showToast('⏳ Your cooldown',`You just bid — wait ${remaining}s`);
+    return;
   }
   // ─────────────────────────────────────────────────────────────────
 
@@ -1709,7 +1881,8 @@ function applyBid(fromId, team, amount){
 
   if(state.isHost){
     clearTimer(); startTimer();
-    updateWar(team); // update war — may start 10s idle for current challenger
+    updateWar(team);
+    triggerCooldowns(team); // start global + player cooldowns
   }
 
   state.myBidAmount=nextBid(amount); updateMyBidVal();
@@ -2044,31 +2217,42 @@ function addAllBots(){
 let botRound=0;
 function scheduleBotBids(){
   if(!state.isHost||state.currentPlayerIdx<0) return;
+  if(warLocked()) return; // war active — startWarCountdown handles bot responses
+
   botRound++; const cr=botRound; const player=ALL_PLAYERS[state.currentPlayerIdx];
   Object.values(state.bots).forEach(bot=>{
     if(bot.team===state.currentBidder) return;
-    const delay=bot.personality==='aggressive'?rnd(600,1800):bot.personality==='conservative'?rnd(2000,5000):rnd(1000,3000);
+
+    // Bot reaction delay = global cooldown remaining + random think time
+    const globalWait = Math.max(0, cooldown.globalUntil - Date.now());
+    const playerWait = Math.max(0, (cooldown.playerUntil[bot.team]||0) - Date.now());
+    const coolWait   = Math.max(globalWait, playerWait);
+    // Add random human-like thinking delay on top of cooldown
+    const thinkDelay = bot.personality==='aggressive' ? rnd(800,2000)
+                     : bot.personality==='conservative' ? rnd(2500,5000)
+                     : rnd(1200,3000);
+    const totalDelay = coolWait + thinkDelay;
+
     setTimeout(()=>{
       if(state.currentPlayerIdx<0||!state.auctionRunning) return;
       if(bot.team===state.currentBidder||bot.lastBidRound===cr) return;
+      if(warLocked()) return; // war started while we were waiting
 
-      // ── WAR LOCK for bots ──────────────────────────────────────
-      // During open phase (war not locked): any bot can bid freely
-      // During war: bot responses are handled by startWarCountdown
-      //             scheduleBotBids should NOT fire for war participants
-      if(warLocked()) return; // war active — startWarCountdown handles bot responses
-      // ──────────────────────────────────────────────────────────
+      // Respect bot's own cooldown
+      if(isPlayerCooldownActive(bot.team)) return;
 
       const dec=botDecide(bot,player);
       if(dec.bid){
         bot.lastBidRound=cr; bot.bidStreak++;
+        // Trigger bot's own cooldown
+        cooldown.playerUntil[bot.team] = Date.now() + getPlayerCooldown();
         relay('BID',{amount:dec.amount,team:bot.team,fromName:bot.name,fromTeam:bot.team});
         applyBid('bot-'+bot.team, bot.team, dec.amount);
         addAuctionChat(bot.name, botTaunt(bot,dec,player),'normal',bot.team);
         const bt=document.getElementById('bot-thinking'); const bn=document.getElementById('bot-thinking-name');
         if(bt&&bn){bn.textContent='🤖 '+bot.name; bt.classList.add('show'); setTimeout(()=>bt.classList.remove('show'),1800);}
       } else {bot.bidStreak=0;}
-    },delay);
+    }, totalDelay);
   });
 }
 
