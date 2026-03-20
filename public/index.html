@@ -273,6 +273,19 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
     <div style="text-align:center"><div style="font-family:'Bebas Neue';font-size:2rem;color:var(--gold)" id="lobby-count">—</div><div style="color:var(--muted);font-size:.7rem;letter-spacing:2px">PLAYERS</div></div>
     <div style="text-align:center"><div style="font-family:'Bebas Neue';font-size:2rem;color:var(--gold)">10</div><div style="color:var(--muted);font-size:.7rem;letter-spacing:2px">TEAMS</div></div>
    </div>
+   <!-- Music Control -->
+   <div style="margin-top:1.5rem;display:flex;align-items:center;justify-content:center;gap:.75rem">
+    <button id="music-btn" onclick="toggleMusic()" style="display:flex;align-items:center;gap:.5rem;padding:8px 18px;background:rgba(245,200,66,.1);border:1px solid rgba(245,200,66,.3);border-radius:30px;color:var(--gold);font-family:'Barlow';font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:1px">
+     <span id="music-icon">🎵</span> <span id="music-label">LOBBY MUSIC</span>
+    </button>
+    <div style="display:flex;align-items:center;gap:.4rem">
+     <span style="color:var(--muted);font-size:.7rem">🔈</span>
+     <input type="range" id="music-vol" min="0" max="100" value="40"
+       oninput="setMusicVol(this.value)"
+       style="width:80px;accent-color:var(--gold);cursor:pointer">
+     <span style="color:var(--muted);font-size:.7rem">🔊</span>
+    </div>
+   </div>
   </div>
   <div class="lobby-panel">
    <div class="lobby-tabs">
@@ -527,6 +540,9 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
   <div id="mic-status" style="margin-top:.75rem;font-size:.75rem;color:var(--muted);min-height:18px"></div>
  </div>
 </div>
+
+<!-- Lobby Background Music -->
+<audio id="lobby-audio" src="/lobby-music.mp3" loop preload="auto"></audio>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
@@ -1009,13 +1025,28 @@ function handleServerMsg(msg){
 
     case 'TEAM_WITHDRAWN':
       if(msg.playerIdx===state.currentPlayerIdx){
-        withdrawnTeams.add(msg.team);
-        addAuctionChat('SYSTEM',`⏱️ ${msg.team} withdrew from bidding (idle ${IDLE_SECS}s)!`,'system');
-        // If MY team was withdrawn, show a toast
+        const tf2=TEAMS.find(t=>t.id===msg.team)||{flag:'⏱️'};
+        addAuctionChat('SYSTEM',`⏱️ ${tf2.flag} ${msg.team} has WITHDRAWN — didn't respond in ${IDLE_SECS}s!`,'system');
         if(msg.team===state.myTeam){
-          showToast('⏱️ Withdrawn','You were idle too long — re-bid to rejoin');
-          withdrawnTeams.delete(state.myTeam); // allow them to re-enter by bidding
+          showToast('⏱️ You withdrew','You were idle — another team can now bid');
         }
+        updateWarBanner(null,null,0);
+      }
+      break;
+
+    case 'WAR_UPDATE':
+      updateWarBanner(msg.leader, msg.challenger, msg.secs);
+      if(msg.challenger&&msg.challenger===state.myTeam){
+        showToast('⚔️ YOUR TURN',`You have ${msg.secs}s to respond or you withdraw!`);
+      }
+      break;
+
+    case 'WAR_TICK':
+      updateWarBanner(war.leader||msg.leader||state.currentBidder, msg.challenger, msg.secs);
+      // Urgent warning for the challenged team at 5s and 3s
+      if(msg.challenger===state.myTeam){
+        if(msg.secs===5) showToast('⚠️ 5 seconds!','Bid now or you withdraw!');
+        if(msg.secs===3) showToast('🚨 3 seconds!','Last chance — bid or withdraw!');
       }
       break;
 
@@ -1407,11 +1438,24 @@ function showPlayerOnStage(p){
 }
 
 // ── BIDDING WAR SYSTEM ────────────────────────────────────────────
-// withdrawnTeams: teams that went idle 10s without bidding during a war
-const withdrawnTeams = new Set();
-const idleTimers = {};  // teamId -> setTimeout handle
+// How it works:
+//   1. Any team can bid at any time (open phase)
+//   2. Once 2 teams have bid, a WAR is formed between:
+//      - warLeader: current highest bidder
+//      - warChallenger: the team they outbid (the previous bidder)
+//   3. The challenger gets 10 seconds to respond.
+//      - If they bid → they become new leader, old leader becomes challenger
+//      - If they don't → they WITHDRAW, war is over, leader wins
+//   4. Any THIRD team can always jump in — they immediately become the
+//      new challenger against the current leader, challenger slot changes
+//   5. On withdraw: show "DC has withdrawn" on all screens, hammer if no war
 
-const IDLE_SECS = 10;   // seconds before a team is auto-withdrawn
+const war = {
+  leader:     null,   // team currently holding highest bid
+  challenger: null,   // team being given 10s to respond
+  idleTimer:  null,   // setTimeout for challenger's 10s window
+};
+const IDLE_SECS = 10;
 
 function startTimer(){
   clearTimer();
@@ -1429,9 +1473,10 @@ function startTimer(){
 }
 function clearTimer(){
   clearInterval(state.timerInterval); state.timerInterval=null; state.timerRunning=false;
-  // Clear all idle timers when the round ends
-  Object.values(idleTimers).forEach(t=>clearTimeout(t));
-  Object.keys(idleTimers).forEach(k=>delete idleTimers[k]);
+  clearWarTimer();
+}
+function clearWarTimer(){
+  clearTimeout(war.idleTimer); war.idleTimer=null;
 }
 function updateTimerUI(){
   const pct=(state.timerSecs/15)*100;
@@ -1440,50 +1485,96 @@ function updateTimerUI(){
   document.getElementById('timer-num').style.color=state.timerSecs<=5?'var(--red)':state.timerSecs<=8?'var(--gold)':'var(--text)';
 }
 
-// Start 10-second idle timer for a team when another team bids
-function startIdleTimer(teamId){
+// Called by host every time a bid lands
+function updateWar(newBidder){
   if(!state.isHost) return;
-  if(withdrawnTeams.has(teamId)) return;    // already withdrawn
-  clearTimeout(idleTimers[teamId]);
-  idleTimers[teamId]=setTimeout(()=>{
-    if(state.currentBidder===teamId) return; // they're the current high bidder — no withdraw
-    if(withdrawnTeams.has(teamId)) return;
-    withdrawTeam(teamId);
-  }, IDLE_SECS*1000);
+  clearWarTimer();
+
+  if(!war.leader){
+    // First bid — no war yet, just note the leader
+    war.leader = newBidder;
+    war.challenger = null;
+    return;
+  }
+
+  if(newBidder === war.leader){
+    // Leader raised their own bid (shouldn't normally happen but handle it)
+    return;
+  }
+
+  // New bidder enters → they become the new leader
+  // Previous leader becomes the challenger who must respond in 10s
+  const prevLeader = war.leader;
+  war.challenger = prevLeader;
+  war.leader = newBidder;
+
+  // Announce the war if both parties are real teams
+  const tf = TEAMS.find(t=>t.id===war.leader)||{flag:'⚔️'};
+  const cf = TEAMS.find(t=>t.id===war.challenger)||{flag:'⚔️'};
+  addAuctionChat('SYSTEM',
+    `⚔️ BIDDING WAR: ${tf.flag} ${war.leader} leads — ${cf.flag} ${war.challenger} has ${IDLE_SECS}s to respond!`,
+    'system');
+
+  // Show war status banner
+  relay('WAR_UPDATE',{leader:war.leader, challenger:war.challenger, secs:IDLE_SECS});
+  updateWarBanner(war.leader, war.challenger, IDLE_SECS);
+
+  // Start 10-second idle timer for the challenger
+  let secsLeft = IDLE_SECS;
+  war.idleTimer = setInterval(()=>{
+    secsLeft--;
+    relay('WAR_TICK',{secs:secsLeft, challenger:war.challenger});
+    updateWarBanner(war.leader, war.challenger, secsLeft);
+    if(secsLeft<=0){
+      clearWarTimer();
+      const loser = war.challenger;
+      war.challenger = null;
+      relay('TEAM_WITHDRAWN',{team:loser, playerIdx:state.currentPlayerIdx});
+      onTeamWithdrawn(loser);
+    }
+  }, 1000);
 }
 
-function withdrawTeam(teamId){
-  if(withdrawnTeams.has(teamId)) return;
-  withdrawnTeams.add(teamId);
-  clearTimeout(idleTimers[teamId]);
-  delete idleTimers[teamId];
-  relay('TEAM_WITHDRAWN',{team:teamId, playerIdx:state.currentPlayerIdx});
-  applyWithdrawal(teamId);
-}
-
-function applyWithdrawal(teamId){
-  if(!state.isHost) return;
-  addAuctionChat('SYSTEM',`⏱️ ${teamId} has withdrawn from bidding (idle ${IDLE_SECS}s)!`,'system');
-  // Check if only 1 active bidder left → hammer immediately
-  const room = state.room;
-  const activeBidders = Object.keys(room?.bidders||{}).filter(id=>{
-    const team = room.bidders[id]?.team;
-    return team && !withdrawnTeams.has(team);
-  });
-  const activeBotTeams = Object.keys(state.bots).filter(t=>!withdrawnTeams.has(t));
-  const totalActive = activeBidders.length + activeBotTeams.length;
-
-  if(totalActive<=1 && state.currentBidder){
-    // Only one bidder left — close the auction now
-    setTimeout(()=>hammer(), 800);
+function onTeamWithdrawn(teamId){
+  const tf=TEAMS.find(t=>t.id===teamId)||{flag:'⏱️'};
+  addAuctionChat('SYSTEM',`⏱️ ${tf.flag} ${teamId} has WITHDRAWN — didn't respond in ${IDLE_SECS}s!`,'system');
+  relay('WAR_UPDATE',{leader:war.leader, challenger:null, secs:0});
+  updateWarBanner(null, null, 0);
+  // No challenger left → leader wins, hammer immediately
+  if(war.leader && state.currentBidder===war.leader){
+    setTimeout(()=>hammer(), 1000);
   }
 }
 
-// Called when the current player changes — reset withdrawal state
+// Called when the current player changes
 function resetWithdrawals(){
-  withdrawnTeams.clear();
-  Object.values(idleTimers).forEach(t=>clearTimeout(t));
-  Object.keys(idleTimers).forEach(k=>delete idleTimers[k]);
+  clearWarTimer();
+  war.leader=null; war.challenger=null;
+  updateWarBanner(null,null,0);
+}
+
+// ── War banner UI ─────────────────────────────────────────────────
+function updateWarBanner(leader, challenger, secs){
+  let el=document.getElementById('war-banner');
+  if(!leader&&!challenger){
+    if(el) el.style.display='none';
+    return;
+  }
+  if(!el){
+    el=document.createElement('div');
+    el.id='war-banner';
+    el.style.cssText='position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(255,71,87,.15);border:1px solid var(--red);border-radius:10px;padding:5px 16px;font-size:.75rem;font-weight:700;letter-spacing:1px;text-align:center;white-space:nowrap;pointer-events:none;';
+    document.getElementById('auction-stage')?.appendChild(el);
+  }
+  el.style.display='block';
+  const lf=TEAMS.find(t=>t.id===leader)||{flag:'⚔️'};
+  const cf=TEAMS.find(t=>t.id===challenger)||{flag:'?'};
+  if(challenger){
+    el.style.borderColor=secs<=3?'var(--red)':secs<=6?'var(--gold)':'rgba(255,107,53,.6)';
+    el.innerHTML=`⚔️ WAR: ${lf.flag} <b style="color:var(--gold)">${leader}</b> leads &nbsp;|&nbsp; ${cf.flag} <b style="color:var(--red)">${challenger}</b> — <span style="color:${secs<=3?'var(--red)':secs<=6?'var(--gold)':'var(--text)'}">${secs}s to respond</span>`;
+  } else {
+    el.innerHTML=`✅ ${lf.flag} <b style="color:var(--gold)">${leader}</b> — no challengers remaining`;
+  }
 }
 
 function placeBid(){
@@ -1500,7 +1591,6 @@ function placeBid(){
   const budget=state.teamBudgets[state.myTeam]*100;
   if(state.myBidAmount>budget){showToast('Over budget!','Not enough funds');return;}
   if(state.myBidAmount<=state.currentBid){showToast('Too low!','Must beat current bid');return;}
-  withdrawnTeams.delete(state.myTeam); // rejoin if previously withdrawn
   relay('BID',{amount:state.myBidAmount, team:state.myTeam});
   applyBid(state.myId, state.myTeam, state.myBidAmount);
 }
@@ -1515,15 +1605,7 @@ function applyBid(fromId, team, amount){
 
   if(state.isHost){
     clearTimer(); startTimer();
-    // Start idle timers for ALL other active bidder teams
-    const room=state.room;
-    const allBidderTeams=[
-      ...Object.values(room?.bidders||{}).map(p=>p.team),
-      ...Object.keys(state.bots)
-    ];
-    allBidderTeams.forEach(t2=>{
-      if(t2!==team) startIdleTimer(t2);
-    });
+    updateWar(team); // update war — may start 10s idle for current challenger
   }
 
   state.myBidAmount=nextBid(amount); updateMyBidVal();
@@ -2193,7 +2275,93 @@ function leaveVoice(){
 // ═══════════════════════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════════════════════
-function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // Auto-pause music when leaving lobby, resume when back
+  if(id==='lobby') resumeLobbyMusic();
+  else pauseLobbyMusic();
+}
+
+// ── LOBBY MUSIC ────────────────────────────────────────────────────
+let musicPlaying=false;
+
+function initLobbyMusic(){
+  const audio=document.getElementById('lobby-audio');
+  if(!audio) return;
+  audio.volume=0.40;
+  // Auto-play with user gesture fallback
+  const tryPlay=()=>{
+    audio.play().then(()=>{
+      musicPlaying=true;
+      updateMusicBtn();
+    }).catch(()=>{
+      // Autoplay blocked — show button, wait for click
+      musicPlaying=false;
+      updateMusicBtn();
+    });
+  };
+  // Try immediately; browsers may allow it
+  tryPlay();
+  // Also try on first user interaction (for browsers that block autoplay)
+  const onFirstInteract=()=>{
+    if(!musicPlaying){ tryPlay(); }
+    document.removeEventListener('click', onFirstInteract);
+    document.removeEventListener('keydown', onFirstInteract);
+  };
+  document.addEventListener('click', onFirstInteract);
+  document.addEventListener('keydown', onFirstInteract);
+}
+
+function toggleMusic(){
+  const audio=document.getElementById('lobby-audio');
+  if(!audio) return;
+  if(musicPlaying){
+    audio.pause(); musicPlaying=false;
+  } else {
+    audio.play().then(()=>{ musicPlaying=true; updateMusicBtn(); }).catch(()=>{});
+    musicPlaying=true;
+  }
+  updateMusicBtn();
+}
+
+function resumeLobbyMusic(){
+  const audio=document.getElementById('lobby-audio');
+  if(!audio||!musicPlaying) return;
+  audio.play().catch(()=>{});
+}
+
+function pauseLobbyMusic(){
+  const audio=document.getElementById('lobby-audio');
+  if(!audio) return;
+  audio.pause();
+}
+
+function setMusicVol(val){
+  const audio=document.getElementById('lobby-audio');
+  if(audio) audio.volume=val/100;
+}
+
+function updateMusicBtn(){
+  const btn=document.getElementById('music-btn');
+  const icon=document.getElementById('music-icon');
+  const label=document.getElementById('music-label');
+  if(!btn) return;
+  if(musicPlaying){
+    btn.style.background='rgba(245,200,66,.2)';
+    btn.style.borderColor='rgba(245,200,66,.6)';
+    if(icon) icon.textContent='🎵';
+    if(label) label.textContent='MUSIC ON';
+  } else {
+    btn.style.background='rgba(255,255,255,.04)';
+    btn.style.borderColor='rgba(255,255,255,.1)';
+    if(icon) icon.textContent='🔇';
+    if(label) label.textContent='MUSIC OFF';
+  }
+}
+
+// Init on page load
+setTimeout(initLobbyMusic, 300);
 </script>
 </body>
 </html>
