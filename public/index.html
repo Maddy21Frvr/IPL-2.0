@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPL Mega Auction 2025</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#08080f;--surface:#0f0f1c;--card:#151525;--card2:#1c1c30;--border:#252540;--gold:#f5c842;--gold2:#e6a800;--accent:#00d4ff;--accent2:#0098cc;--green:#00e676;--red:#ff4757;--text:#eeeeff;--muted:#7070a0;}
+*{margin:0;padding:0;box-sizing:border-box;}html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;}
+.screen{position:fixed;inset:0;display:none;flex-direction:column;overflow:hidden;}
+.screen.active{display:flex;}
+
+/* LOBBY */
+#lobby{background:radial-gradient(ellipse at 30% 20%,rgba(0,212,255,.08),transparent 50%),radial-gradient(ellipse at 80% 80%,rgba(245,200,66,.06),transparent 50%),var(--bg);align-items:center;justify-content:center;}
+.lobby-wrap{width:100%;max-width:1100px;padding:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:center;}
+.brand-bling{font-size:5rem;filter:drop-shadow(0 0 30px rgba(245,200,66,.5));animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.brand-title{font-family:'Bebas Neue';font-size:5rem;line-height:.9;letter-spacing:3px;background:linear-gradient(135deg,var(--gold),var(--accent),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.brand-sub{color:var(--muted);font-size:.85rem;letter-spacing:4px;text-transform:uppercase;margin-top:.5rem;}
+.lobby-panel{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.lobby-tabs{display:flex;background:var(--surface);border-radius:10px;padding:4px;gap:4px;margin-bottom:1.5rem;}
+.ltab{flex:1;padding:10px;text-align:center;border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem;letter-spacing:1px;color:var(--muted);transition:all .2s;}
+.ltab.active{background:var(--gold);color:#000;}
+.lobby-form{display:flex;flex-direction:column;gap:.75rem;}
+.lf-label{color:var(--muted);font-size:.7rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:.2rem;}
+.lf-input{width:100%;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Barlow';font-size:.95rem;outline:none;transition:border-color .2s;}
+.lf-input:focus{border-color:var(--accent);}
+.lf-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237070a0' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer;}
+.lf-btn{padding:14px;border:none;border-radius:12px;font-family:'Bebas Neue';font-size:1.5rem;letter-spacing:3px;cursor:pointer;transition:all .2s;margin-top:.25rem;}
+.lf-btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;}
+.lf-btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(245,200,66,.4);}
+.lf-btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);}
+.lf-btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.room-list{display:flex;flex-direction:column;gap:.5rem;max-height:200px;overflow-y:auto;}
+.room-item{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;}
+.room-item:hover{border-color:var(--accent);}
+.room-item-name{font-weight:600;font-size:.9rem;}.room-item-info{color:var(--muted);font-size:.75rem;margin-top:2px;}
+.badge{padding:4px 10px;border-radius:20px;font-size:.7rem;font-weight:700;letter-spacing:1px;}
+.badge-waiting{background:rgba(0,230,118,.15);color:var(--green);}
+.badge-live{background:rgba(255,71,87,.15);color:var(--red);}
+.badge-full{background:rgba(168,85,247,.15);color:#a855f7;}
+.conn-bar{position:fixed;top:0;left:0;right:0;z-index:9999;padding:6px;text-align:center;font-size:.8rem;font-weight:600;display:none;}
+.conn-bar.connecting{display:block;background:#1c1c30;color:var(--muted);}
+.conn-bar.error{display:block;background:rgba(255,71,87,.3);color:var(--red);}
+
+/* WAITING ROOM */
+#waiting{background:var(--bg);padding:1.25rem 1.5rem;gap:1rem;}
+.wr-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;}
+.wr-code{font-family:'Bebas Neue';font-size:2rem;color:var(--gold);letter-spacing:4px;}
+.wr-body{flex:1;display:grid;grid-template-columns:1fr 320px;gap:1rem;min-height:0;overflow:hidden;}
+.wr-players{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.25rem;overflow-y:auto;}
+.wr-chat-panel{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;min-height:0;}
+.wr-player-item{display:flex;align-items:center;gap:.75rem;padding:10px;border-radius:10px;}
+.wr-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;border:2px solid var(--border);}
+.section-head{font-family:'Bebas Neue';font-size:.9rem;letter-spacing:2px;color:var(--muted);padding:.4rem .5rem;text-transform:uppercase;}
+.spectator-banner{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:.75rem;font-size:.85rem;}
+.slot-banner{background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);border-radius:10px;padding:.75rem 1rem;margin-bottom:.75rem;font-size:.85rem;display:none;}
+
+/* BOT SECTION */
+.bot-section{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);}
+.bot-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.5rem;}
+.bot-slot{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.5rem .6rem;display:flex;align-items:center;gap:.4rem;cursor:pointer;transition:all .15s;position:relative;}
+.bot-slot:hover{border-color:var(--accent);}
+.bot-slot.active{border-color:var(--green);background:rgba(0,230,118,.06);}
+.bot-dot{width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0;transition:background .2s;}
+.bot-slot.active .bot-dot{background:var(--green);}
+.bot-name{font-size:.72rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.bot-style{font-size:.6rem;color:var(--muted);}
+.bot-remove{position:absolute;right:4px;top:50%;transform:translateY(-50%);color:var(--red);font-size:.7rem;opacity:0;cursor:pointer;}
+.bot-slot.active:hover .bot-remove{opacity:1;}
+.add-bots-btn{width:100%;padding:8px;background:rgba(0,212,255,.08);border:1px dashed rgba(0,212,255,.3);border-radius:8px;color:var(--accent);font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s;margin-top:.5rem;text-align:center;}
+.add-bots-btn:hover{background:rgba(0,212,255,.15);}
+.bi-btn{flex:1;padding:5px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.65rem;font-weight:600;cursor:pointer;letter-spacing:.5px;transition:all .15s;}
+.bi-btn.active{background:rgba(245,200,66,.15);border-color:var(--gold);color:var(--gold);}
+
+/* AUCTION */
+.auction-layout{display:grid;grid-template-columns:260px 1fr 300px;height:100vh;overflow:hidden;}
+@media(min-width:1500px){.auction-layout{grid-template-columns:300px 1fr 340px;}}
+@media(max-width:1200px){.auction-layout{grid-template-columns:220px 1fr 260px;}}
+@media(max-width:960px){.auction-layout{grid-template-columns:1fr 240px;}.left-panel{display:none;}}
+@media(max-width:640px){.auction-layout{grid-template-columns:1fr;}.right-panel{display:none;}.bid-controls{flex-wrap:wrap;}}
+.left-panel{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.lp-header{padding:.75rem 1rem;border-bottom:1px solid var(--border);background:var(--surface);}
+.lp-title{font-family:'Bebas Neue';font-size:1.3rem;letter-spacing:2px;color:var(--gold);}
+.lp-search{width:100%;padding:7px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;outline:none;margin-top:.5rem;}
+.lp-search:focus{border-color:var(--accent);}
+.player-pool{flex:1;overflow-y:auto;padding:.4rem;}
+.pool-player{display:flex;align-items:center;gap:.5rem;padding:7px 8px;border-radius:8px;cursor:pointer;transition:all .15s;border:1px solid transparent;}
+.pool-player:hover{background:var(--surface);border-color:var(--border);}
+.pool-player.current{background:rgba(245,200,66,.1);border-color:var(--gold);}
+.pool-player.sold{opacity:.4;}
+.pp-avatar{width:28px;height:28px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+.pp-name{font-weight:600;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:105px;}
+.pp-role-tag{font-size:.6rem;color:var(--muted);}
+.pp-base{font-size:.7rem;color:var(--gold);font-weight:600;flex-shrink:0;}
+.role-tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:.6rem;font-weight:700;letter-spacing:.5px;}
+.rt-BAT{background:rgba(245,200,66,.2);color:var(--gold);}
+.rt-BOWL{background:rgba(255,71,87,.2);color:var(--red);}
+.rt-AR{background:rgba(0,230,118,.2);color:var(--green);}
+.rt-WK{background:rgba(0,212,255,.2);color:var(--accent);}
+.center-panel{display:flex;flex-direction:column;overflow:hidden;position:relative;}
+.auction-topbar{background:linear-gradient(135deg,var(--surface),var(--card));border-bottom:1px solid var(--border);padding:.5rem 1rem;display:flex;align-items:center;gap:.6rem;flex-shrink:0;flex-wrap:wrap;}
+.atb-room{font-family:'Bebas Neue';font-size:1rem;color:var(--gold);letter-spacing:2px;}
+.atb-sep{color:var(--border);font-size:1.2rem;}
+.atb-stat{text-align:center;min-width:40px;}
+.atb-val{font-family:'Bebas Neue';font-size:1rem;}
+.atb-lbl{font-size:.55rem;color:var(--muted);letter-spacing:1px;}
+.atb-spacer{flex:1;}
+.live-pill{background:rgba(255,71,87,.15);border:1px solid var(--red);color:var(--red);padding:4px 10px;border-radius:20px;font-size:.65rem;font-weight:700;letter-spacing:1px;display:flex;align-items:center;gap:5px;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:blink 1s infinite;}
+.spec-pill{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.4);color:#a855f7;padding:4px 10px;border-radius:20px;font-size:.65rem;font-weight:700;letter-spacing:1px;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.auction-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;position:relative;overflow:hidden;}
+.stage-rings{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.ring{position:absolute;border-radius:50%;border:1px solid rgba(245,200,66,.04);}
+.ring1{width:500px;height:500px;animation:spin 30s linear infinite;}
+.ring2{width:350px;height:350px;animation:spin 20s linear infinite reverse;}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.player-on-stage{position:relative;z-index:2;width:min(340px,90%);background:linear-gradient(135deg,var(--card),var(--card2));border:2px solid var(--border);border-radius:24px;padding:1.75rem;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.8);transform:translateY(60px);opacity:0;transition:none;}
+.player-on-stage.entered{transform:translateY(0);opacity:1;transition:transform .5s cubic-bezier(.34,1.56,.64,1),opacity .4s ease;}
+.player-on-stage.exiting{transform:translateY(-80px) scale(.9);opacity:0;transition:transform .4s ease,opacity .3s ease;}
+.ps-cat{font-size:.6rem;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:.5rem;}
+.ps-avatar{font-size:3.5rem;margin-bottom:.25rem;}
+.ps-name{font-family:'Bebas Neue';font-size:2rem;letter-spacing:2px;line-height:1;margin-bottom:.2rem;}
+.ps-meta{color:var(--muted);font-size:.78rem;letter-spacing:1px;margin-bottom:.5rem;}
+.ps-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin:.75rem 0;}
+.ps-stat{background:rgba(255,255,255,.03);border-radius:8px;padding:.4rem;}
+.ps-stat-val{font-family:'Bebas Neue';font-size:1.1rem;}
+.ps-stat-lbl{font-size:.55rem;color:var(--muted);}
+.ps-base{color:var(--muted);font-size:.72rem;margin-top:.3rem;}
+.ps-base-val{color:var(--gold);font-weight:700;}
+.bid-display{position:relative;z-index:2;display:flex;align-items:center;gap:1.5rem;margin-top:1.25rem;}
+.bid-label{font-size:.6rem;letter-spacing:3px;color:var(--muted);text-transform:uppercase;}
+.bid-amount{font-family:'Bebas Neue';font-size:3.5rem;line-height:1;background:linear-gradient(135deg,var(--gold),#fff,var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.bid-team-name{font-family:'Bebas Neue';font-size:1.2rem;letter-spacing:2px;}
+.bid-team-flag{font-size:1.8rem;}
+.timer-wrap{position:relative;z-index:2;margin-top:.75rem;}
+.timer-bar{height:4px;background:var(--border);border-radius:2px;width:min(280px,80%);overflow:hidden;}
+.timer-fill{height:100%;border-radius:2px;transition:width .1s linear;background:linear-gradient(90deg,var(--green),var(--gold),var(--red));}
+.timer-num{text-align:center;font-family:'Bebas Neue';font-size:1.4rem;margin-top:.2rem;}
+.bid-controls{background:var(--card);border-top:1px solid var(--border);padding:.6rem 1rem;display:flex;align-items:center;gap:.5rem;flex-shrink:0;flex-wrap:wrap;}
+.bid-inc-btns{display:flex;gap:.35rem;flex-wrap:wrap;}
+.bid-inc{padding:5px 9px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:7px;color:var(--gold);font-weight:700;font-size:.72rem;cursor:pointer;transition:all .15s;}
+.bid-inc:hover{background:rgba(245,200,66,.1);border-color:var(--gold);}
+.bid-main{flex:1;display:flex;gap:.5rem;min-width:180px;}
+.my-bid-val{flex:1;padding:9px 12px;background:var(--surface);border:1px solid var(--accent);border-radius:9px;color:var(--accent);font-family:'Bebas Neue';font-size:1.1rem;text-align:center;letter-spacing:1px;}
+.place-bid-btn{padding:9px 20px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:9px;color:#000;font-family:'Bebas Neue';font-size:1.2rem;letter-spacing:2px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.place-bid-btn:hover{transform:scale(1.02);box-shadow:0 4px 20px rgba(245,200,66,.4);}
+.place-bid-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+.my-budget{padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px;text-align:center;flex-shrink:0;}
+.my-budget-val{font-family:'Bebas Neue';font-size:1.1rem;color:var(--green);}
+.my-budget-lbl{font-size:.55rem;color:var(--muted);letter-spacing:1px;}
+.right-panel{background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.rp-tabs{display:flex;border-bottom:1px solid var(--border);}
+.rp-tab{flex:1;padding:.65rem;text-align:center;font-size:.72rem;font-weight:600;letter-spacing:1px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;}
+.rp-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.rp-body{flex:1;overflow-y:auto;padding:.6rem;}
+.rp-body::-webkit-scrollbar{width:3px;}
+.rp-body::-webkit-scrollbar-thumb{background:var(--border);}
+.team-row{display:flex;align-items:center;gap:.5rem;padding:.5rem .65rem;background:var(--surface);border:1px solid var(--border);border-radius:9px;margin-bottom:.35rem;}
+.team-row.me{border-color:var(--gold);}
+.tr-flag{font-size:1rem;width:24px;text-align:center;}
+.tr-info{flex:1;min-width:0;}
+.tr-name{font-weight:600;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tr-stats{font-size:.62rem;color:var(--muted);}
+.tr-bval{font-family:'Bebas Neue';font-size:.95rem;color:var(--green);}
+.tr-blbl{font-size:.55rem;color:var(--muted);}
+.sold-item{display:flex;align-items:center;gap:.5rem;padding:.5rem;border-bottom:1px solid rgba(255,255,255,.04);}
+.si-name{font-size:.78rem;font-weight:600;}
+.si-role{font-size:.6rem;color:var(--muted);}
+.si-price{font-family:'Bebas Neue';font-size:.95rem;color:var(--gold);}
+.si-team{font-size:.6rem;color:var(--muted);}
+.chat-msg{padding:5px 9px;border-radius:8px;background:var(--surface);max-width:95%;border:1px solid var(--border);margin-bottom:.3rem;}
+.chat-msg.me{background:rgba(0,212,255,.08);border-color:rgba(0,212,255,.2);align-self:flex-end;}
+.chat-msg.system{background:rgba(245,200,66,.06);border-color:rgba(245,200,66,.15);align-self:center;text-align:center;}
+.cm-author{font-size:.62rem;font-weight:700;margin-bottom:2px;}
+.cm-text{font-size:.78rem;line-height:1.4;}
+.cm-time{font-size:.58rem;color:var(--muted);margin-top:2px;}
+.chat-input-row{padding:.6rem;border-top:1px solid var(--border);display:flex;gap:.4rem;flex-shrink:0;}
+.chat-input{flex:1;padding:7px 11px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:.82rem;outline:none;font-family:'Barlow';}
+.chat-input:focus{border-color:var(--accent);}
+.chat-send{padding:7px 12px;background:var(--accent2);border:none;border-radius:7px;color:#fff;cursor:pointer;font-weight:700;font-size:.78rem;}
+
+/* OVERLAYS */
+.player-callout{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.92);}
+.player-callout.show{display:flex;}
+.callout-player{font-family:'Bebas Neue';font-size:5.5rem;line-height:.9;background:linear-gradient(135deg,var(--gold),var(--text),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:calloutSlide .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes calloutSlide{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.callout-bar{width:100%;height:3px;background:var(--border);border-radius:2px;margin-top:1.5rem;overflow:hidden;}
+.callout-bar-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--accent));animation:barFill 2.2s linear forwards;}
+@keyframes barFill{from{width:0}to{width:100%}}
+.hammer-anim{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;flex-direction:column;}
+.hammer-anim.show{display:flex;}
+.ha-ring{width:180px;height:180px;border-radius:50%;border:3px solid var(--gold);display:flex;align-items:center;justify-content:center;animation:ringPop .5s cubic-bezier(.34,1.56,.64,1);position:relative;}
+@keyframes ringPop{from{transform:scale(0)}to{transform:scale(1)}}
+.ha-ring::before,.ha-ring::after{content:'';position:absolute;border-radius:50%;border:2px solid rgba(245,200,66,.3);animation:ripple 1.5s ease-out infinite;}
+.ha-ring::before{width:220px;height:220px;animation-delay:.2s;}
+.ha-ring::after{width:260px;height:260px;animation-delay:.4s;}
+@keyframes ripple{0%{transform:scale(.8);opacity:1}100%{transform:scale(1.4);opacity:0}}
+.ha-emoji{font-size:4.5rem;}
+.ha-sold{font-family:'Bebas Neue';font-size:4.5rem;letter-spacing:6px;color:var(--gold);text-shadow:0 0 40px rgba(245,200,66,.6);margin:.5rem 0;animation:soldBounce .5s cubic-bezier(.34,1.56,.64,1) .3s both;}
+@keyframes soldBounce{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.ha-player{font-family:'Bebas Neue';font-size:1.6rem;letter-spacing:2px;}
+.ha-price{font-family:'Bebas Neue';font-size:2.8rem;color:var(--green);margin:.2rem 0;}
+.ha-team{color:var(--muted);font-size:.85rem;letter-spacing:2px;}
+.confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.unsold-anim{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;flex-direction:column;}
+.unsold-anim.show{display:flex;}
+.ua-x{font-size:3.5rem;}
+.ua-text{font-family:'Bebas Neue';font-size:3.5rem;color:var(--red);letter-spacing:4px;}
+.ua-name{color:var(--muted);font-size:.9rem;margin-top:.4rem;letter-spacing:2px;}
+.bid-toast{position:fixed;top:70px;right:1.5rem;z-index:300;background:var(--card);border:1px solid var(--gold);border-radius:12px;padding:.6rem 1rem;transform:translateX(120%);transition:transform .3s cubic-bezier(.34,1.56,.64,1);max-width:220px;box-shadow:0 8px 30px rgba(0,0,0,.5);}
+.bid-toast.show{transform:translateX(0);}
+.bt-name{font-weight:700;font-size:.82rem;color:var(--gold);}
+.bt-msg{font-size:.72rem;color:var(--muted);margin-top:2px;}
+.bot-thinking{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-size:.7rem;color:var(--accent);white-space:nowrap;display:none;z-index:50;}
+.bot-thinking.show{display:block;animation:botPop .3s cubic-bezier(.34,1.56,.64,1);}
+@keyframes botPop{from{transform:translateX(-50%) scale(.7);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+
+/* RESULTS */
+#results{background:radial-gradient(ellipse at 50% 0%,rgba(245,200,66,.1),transparent 50%),var(--bg);align-items:center;justify-content:center;flex-direction:column;gap:1.5rem;}
+.results-title{font-family:'Bebas Neue';font-size:3.5rem;color:var(--gold);letter-spacing:4px;}
+.results-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;max-width:1000px;width:100%;padding:0 1.5rem;overflow-y:auto;max-height:70vh;}
+.result-team{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;}
+.rt-head{display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;}
+.rt-player-item{font-size:.72rem;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;justify-content:space-between;}
+
+/* VOICE BAR */
+.voice-bar{background:linear-gradient(135deg,#0a0a1a,#10102a);border-top:1px solid var(--border);padding:.4rem .75rem;display:flex;align-items:center;gap:.5rem;flex-shrink:0;flex-wrap:wrap;min-height:44px;}
+.voice-bar-label{font-size:.6rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;white-space:nowrap;}
+.voice-users{display:flex;gap:.3rem;flex:1;flex-wrap:wrap;align-items:center;}
+.voice-user{display:flex;align-items:center;gap:.3rem;padding:2px 8px;border-radius:20px;background:var(--surface);border:1px solid var(--border);font-size:.68rem;font-weight:600;}
+.voice-user.speaking{background:rgba(0,230,118,.12);border-color:var(--green);box-shadow:0 0 8px rgba(0,230,118,.3);}
+.voice-user.me{border-color:var(--accent);}
+.vu-dot{width:5px;height:5px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+.voice-user.speaking .vu-dot{background:var(--green);}
+.mic-controls{display:flex;align-items:center;gap:.4rem;flex-shrink:0;}
+.mic-btn{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:var(--surface);cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.mic-btn.live{background:rgba(0,230,118,.2);border-color:var(--green);box-shadow:0 0 10px rgba(0,230,118,.4);}
+.mic-btn.muted{background:rgba(255,71,87,.1);border-color:rgba(255,71,87,.4);}
+.vol-meter{width:36px;height:4px;background:var(--border);border-radius:3px;overflow:hidden;}
+.vol-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--gold));width:0%;transition:width .06s;}
+.hand-toast{position:fixed;top:64px;left:50%;transform:translateX(-50%) scale(.8);opacity:0;background:var(--card);border:1px solid var(--gold);border-radius:10px;padding:.5rem 1rem;z-index:500;pointer-events:none;transition:all .3s cubic-bezier(.34,1.56,.64,1);font-size:.8rem;}
+.hand-toast.show{transform:translateX(-50%) scale(1);opacity:1;}
+
+/* WAITING ROOM VOICE */
+.wr-voice{background:var(--card2);border-top:1px solid var(--border);padding:.75rem 1rem;flex-shrink:0;}
+.wr-voice-title{font-size:.65rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:.5rem;display:flex;justify-content:space-between;}
+
+/* MIC MODAL */
+@keyframes micModalIn{from{transform:scale(.75);opacity:0}to{transform:scale(1);opacity:1}}
+
+@media(max-width:800px){.lobby-wrap{grid-template-columns:1fr;}.lobby-brand{display:none;}.wr-body{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<div class="conn-bar" id="conn-bar">Connecting to server…</div>
+
+<!-- LOBBY -->
+<div class="screen active" id="lobby">
+ <div class="lobby-wrap">
+  <div class="lobby-brand" style="text-align:center">
+   <div class="brand-bling">🏏</div>
+   <div class="brand-title">IPL<br>MEGA<br>AUCTION</div>
+   <div class="brand-sub">2025 Edition · Multiplayer</div>
+   <div style="display:flex;gap:1.5rem;justify-content:center;margin-top:1.5rem">
+    <div style="text-align:center"><div style="font-family:'Bebas Neue';font-size:2rem;color:var(--gold)" id="lobby-count">—</div><div style="color:var(--muted);font-size:.7rem;letter-spacing:2px">PLAYERS</div></div>
+    <div style="text-align:center"><div style="font-family:'Bebas Neue';font-size:2rem;color:var(--gold)">10</div><div style="color:var(--muted);font-size:.7rem;letter-spacing:2px">TEAMS</div></div>
+   </div>
+  </div>
+  <div class="lobby-panel">
+   <div class="lobby-tabs">
+    <div class="ltab active" onclick="lobbyTab('create')">CREATE ROOM</div>
+    <div class="ltab" onclick="lobbyTab('join')">JOIN ROOM</div>
+   </div>
+   <div id="create-form" class="lobby-form">
+    <div><div class="lf-label">Your Name</div><input class="lf-input" id="create-name" placeholder="Enter your name" maxlength="20"></div>
+    <div><div class="lf-label">Your Team</div><select class="lf-input lf-select" id="create-team"></select></div>
+    <div><div class="lf-label">Room Name</div><input class="lf-input" id="create-room-name" placeholder="e.g. Weekend Auction" maxlength="24"></div>
+    <div><div class="lf-label">Budget per Team</div>
+     <select class="lf-input lf-select" id="create-budget">
+      <option value="100">₹100 Cr</option><option value="120" selected>₹120 Cr</option>
+      <option value="150">₹150 Cr</option><option value="200">₹200 Cr</option>
+     </select>
+    </div>
+    <button class="lf-btn lf-btn-primary" onclick="createRoom()">🏏 CREATE &amp; HOST</button>
+   </div>
+   <div id="join-form" class="lobby-form" style="display:none">
+    <div><div class="lf-label">Your Name</div><input class="lf-input" id="join-name" placeholder="Enter your name" maxlength="20"></div>
+    <div><div class="lf-label">Your Team (if bidding)</div><select class="lf-input lf-select" id="join-team"></select></div>
+    <div class="lf-label" style="margin-top:.25rem">Active Rooms</div>
+    <div class="room-list" id="room-list"><div style="text-align:center;color:var(--muted);padding:1rem;font-size:.85rem">Loading rooms…</div></div>
+    <div style="display:flex;gap:.5rem">
+     <input class="lf-input" id="join-code" placeholder="Or enter room code" style="flex:1" maxlength="10">
+     <button class="lf-btn lf-btn-secondary" style="width:auto;padding:0 16px;font-size:1rem" onclick="joinByCode()">JOIN</button>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+
+<!-- WAITING ROOM -->
+<div class="screen" id="waiting">
+ <div class="wr-header">
+  <div>
+   <div style="font-family:'Bebas Neue';font-size:1.8rem;color:var(--gold);letter-spacing:3px">AUCTION LOBBY</div>
+   <div style="color:var(--muted);font-size:.8rem">Room: <b id="wr-room-name" style="color:var(--text)"></b> · Code: <span class="wr-code" id="wr-code"></span></div>
+  </div>
+  <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+   <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:7px 14px;text-align:center">
+    <div style="font-size:.55rem;color:var(--muted);letter-spacing:2px">YOUR TEAM</div>
+    <div id="wr-my-team" style="font-family:'Bebas Neue';font-size:1.2rem;color:var(--gold)"></div>
+   </div>
+   <button class="lf-btn lf-btn-secondary" style="padding:8px 18px;font-size:1.1rem" onclick="leaveRoom()">← LEAVE</button>
+   <button class="lf-btn lf-btn-primary" id="start-btn" style="padding:8px 22px;font-size:1.1rem;display:none" onclick="startAuction()">START ⚡</button>
+  </div>
+ </div>
+ <div class="wr-body">
+  <div class="wr-players">
+   <div id="spectator-banner" class="spectator-banner" style="display:none">
+    👁️ You are <b>spectating</b> — the room is full (2 bidders). You can watch live but can't bid.
+    <br><span style="color:var(--muted);font-size:.75rem">You'll get a notification when a slot opens up.</span>
+   </div>
+   <div id="slot-banner" class="slot-banner">
+    🎉 <b>A slot opened!</b> Pick a team to join as a bidder.
+    <select class="lf-input lf-select" id="slot-team" style="margin-top:.5rem;padding:8px 12px"></select>
+    <button class="lf-btn lf-btn-primary" style="margin-top:.4rem;padding:8px;font-size:1.1rem" onclick="claimSlot()">JOIN AS BIDDER</button>
+   </div>
+   <div class="section-head">BIDDERS (MAX 2)</div>
+   <div id="wr-bidder-list"></div>
+   <div class="section-head" style="margin-top:.5rem">SPECTATORS</div>
+   <div id="wr-spec-list"></div>
+   <!-- BOT SECTION (host only) -->
+   <div class="bot-section" id="bot-section" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+     <div class="section-head" style="padding:0">🤖 AI BOT TEAMS</div>
+     <span id="bot-count-badge" style="background:rgba(0,212,255,.15);color:var(--accent);padding:2px 8px;border-radius:10px;font-size:.65rem">0 bots</span>
+    </div>
+    <div style="display:flex;gap:.25rem;margin:.4rem 0">
+     <button class="bi-btn active" id="bi-smart" onclick="setBotIQ('smart')">SMART</button>
+     <button class="bi-btn" id="bi-aggressive" onclick="setBotIQ('aggressive')">AGGRESSIVE</button>
+     <button class="bi-btn" id="bi-cautious" onclick="setBotIQ('cautious')">CAUTIOUS</button>
+    </div>
+    <div class="bot-grid" id="bot-grid"></div>
+    <div class="add-bots-btn" onclick="addAllBots()">+ FILL REMAINING TEAMS WITH BOTS</div>
+   </div>
+  </div>
+  <div class="wr-chat-panel">
+   <div style="padding:.75rem 1rem;border-bottom:1px solid var(--border);font-family:'Bebas Neue';font-size:1rem;color:var(--accent);letter-spacing:2px">💬 ROOM CHAT</div>
+   <div id="wr-chat-msgs" style="flex:1;overflow-y:auto;padding:.6rem;display:flex;flex-direction:column;gap:.3rem;min-height:0"></div>
+   <div class="wr-voice">
+    <div class="wr-voice-title"><span>🎙️ VOICE</span><span id="wr-voice-status" style="color:var(--muted)">Not connected</span></div>
+    <div class="voice-users" id="wr-voice-users" style="margin-bottom:.4rem;min-height:22px"></div>
+    <div style="display:flex;align-items:center;gap:.4rem">
+     <button class="mic-btn muted" id="wr-mic-btn" onclick="toggleMic()">🎤</button>
+     <div class="vol-meter"><div class="vol-fill" id="wr-vol-fill"></div></div>
+     <button class="lf-btn lf-btn-secondary" style="padding:4px 10px;font-size:.7rem;margin:0" onclick="joinVoice()">JOIN VOICE</button>
+    </div>
+   </div>
+   <div class="chat-input-row">
+    <input class="chat-input" id="wr-chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendWrChat()">
+    <button class="chat-send" onclick="sendWrChat()">SEND</button>
+   </div>
+  </div>
+ </div>
+</div>
+
+<!-- AUCTION -->
+<div class="screen" id="auction">
+ <div class="auction-layout">
+  <div class="left-panel">
+   <div class="lp-header">
+    <div class="lp-title">PLAYER POOL</div>
+    <input class="lp-search" id="pool-search" placeholder="Search players…" oninput="renderPool()">
+    <div style="display:flex;gap:3px;margin-top:.4rem;flex-wrap:wrap">
+     <span class="role-tag rt-BAT" style="cursor:pointer;padding:3px 7px" onclick="toggleFilter('BAT')">BAT</span>
+     <span class="role-tag rt-BOWL" style="cursor:pointer;padding:3px 7px" onclick="toggleFilter('BOWL')">BOWL</span>
+     <span class="role-tag rt-AR" style="cursor:pointer;padding:3px 7px" onclick="toggleFilter('AR')">AR</span>
+     <span class="role-tag rt-WK" style="cursor:pointer;padding:3px 7px" onclick="toggleFilter('WK')">WK</span>
+    </div>
+   </div>
+   <div class="player-pool" id="player-pool"></div>
+  </div>
+  <div class="center-panel">
+   <div class="auction-topbar">
+    <div><div style="font-size:.55rem;color:var(--muted);letter-spacing:1px">ROOM</div><div class="atb-room" id="atb-room">—</div></div>
+    <div class="atb-sep">|</div>
+    <div class="atb-stat"><div class="atb-val" id="atb-sold">0</div><div class="atb-lbl">SOLD</div></div>
+    <div class="atb-stat"><div class="atb-val" id="atb-unsold">0</div><div class="atb-lbl">UNSOLD</div></div>
+    <div class="atb-stat"><div class="atb-val" id="atb-remain">—</div><div class="atb-lbl">LEFT</div></div>
+    <div class="atb-spacer"></div>
+    <div id="host-controls" style="display:none;gap:.4rem;align-items:center" class="flex">
+     <button class="lf-btn lf-btn-secondary" style="padding:5px 12px;font-size:.75rem" onclick="skipPlayer()">SKIP ⏭</button>
+     <button class="lf-btn lf-btn-secondary" style="padding:5px 12px;font-size:.75rem" onclick="markUnsold()">UNSOLD ✗</button>
+    </div>
+    <div id="spec-pill" class="spec-pill" style="display:none">👁️ SPECTATING</div>
+    <div class="live-pill"><div class="live-dot"></div>LIVE</div>
+   </div>
+   <div class="auction-stage" id="auction-stage">
+    <div class="stage-rings" style="z-index:1"><div class="ring ring1"></div><div class="ring ring2"></div></div>
+    <div class="bot-thinking" id="bot-thinking"><span id="bot-thinking-name">🤖 Thinking…</span></div>
+    <div id="no-player-msg" style="text-align:center;color:var(--muted);z-index:2">
+     <div style="font-size:3rem;margin-bottom:.5rem">🏏</div>
+     <div style="font-family:'Bebas Neue';font-size:1.8rem;letter-spacing:3px">WAITING FOR AUCTION</div>
+    </div>
+    <div class="player-on-stage" id="player-card" style="display:none">
+     <div class="ps-cat" id="ps-cat">BATSMAN</div>
+     <div class="ps-avatar" id="ps-avatar">🧔</div>
+     <div class="ps-name" id="ps-name">Player</div>
+     <div class="ps-meta" id="ps-meta">Country · Role</div>
+     <div class="ps-stats" id="ps-stats"></div>
+     <div class="ps-base">BASE: <span class="ps-base-val" id="ps-base">₹20L</span></div>
+    </div>
+    <div class="bid-display" id="bid-display" style="display:none">
+     <div style="text-align:center"><div class="bid-label">CURRENT BID</div><div class="bid-amount" id="bid-amount">₹20L</div></div>
+     <div style="color:var(--muted);font-size:1.5rem">→</div>
+     <div style="text-align:center"><div class="bid-team-flag" id="bt-flag">—</div><div class="bid-team-name" id="bt-name">No bids</div></div>
+    </div>
+    <div class="timer-wrap" id="timer-wrap" style="display:none">
+     <div class="timer-bar"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
+     <div class="timer-num" id="timer-num">15</div>
+    </div>
+   </div>
+   <div class="bid-controls" id="bid-controls">
+    <div class="my-budget"><div class="my-budget-val" id="my-budget-val">₹120Cr</div><div class="my-budget-lbl">BUDGET</div></div>
+    <div class="bid-inc-btns">
+     <button class="bid-inc" onclick="adjustBid(5)">+5L</button>
+     <button class="bid-inc" onclick="adjustBid(10)">+10L</button>
+     <button class="bid-inc" onclick="adjustBid(25)">+25L</button>
+     <button class="bid-inc" onclick="adjustBid(50)">+50L</button>
+     <button class="bid-inc" onclick="adjustBid(100)">+1Cr</button>
+    </div>
+    <div class="bid-main">
+     <div class="my-bid-val" id="my-bid-val">₹20L</div>
+     <button class="place-bid-btn" id="place-bid-btn" onclick="placeBid()">BID 🔨</button>
+    </div>
+   </div>
+   <div class="voice-bar">
+    <span class="voice-bar-label">🎙️ VOICE</span>
+    <div class="voice-users" id="auc-voice-users"></div>
+    <div class="mic-controls">
+     <button class="mic-btn muted" id="auc-mic-btn" onclick="toggleMic()">🎤</button>
+     <div class="vol-meter"><div class="vol-fill" id="auc-vol-fill"></div></div>
+    </div>
+   </div>
+  </div>
+  <div class="right-panel">
+   <div class="rp-tabs">
+    <div class="rp-tab active" onclick="rpTab('chat')">CHAT</div>
+    <div class="rp-tab" onclick="rpTab('teams')">TEAMS</div>
+    <div class="rp-tab" onclick="rpTab('sold')">SOLD</div>
+   </div>
+   <div class="rp-body" id="rp-body"></div>
+   <div id="chat-footer" class="chat-input-row">
+    <input class="chat-input" id="auc-chat-input" placeholder="Message…" onkeydown="if(event.key==='Enter')sendAuctionChat()">
+    <button class="chat-send" onclick="sendAuctionChat()">SEND</button>
+   </div>
+  </div>
+ </div>
+</div>
+
+<!-- RESULTS -->
+<div class="screen" id="results">
+ <div class="results-title">🏆 AUCTION COMPLETE</div>
+ <div class="results-grid" id="results-grid"></div>
+ <button class="lf-btn lf-btn-primary" style="width:180px;margin-top:1rem" onclick="location.reload()">PLAY AGAIN</button>
+</div>
+
+<!-- OVERLAYS -->
+<div class="player-callout" id="player-callout">
+ <div style="text-align:center">
+  <div style="font-size:.65rem;letter-spacing:4px;color:var(--muted);margin-bottom:.5rem">NEXT UP FOR AUCTION</div>
+  <div class="callout-player" id="callout-name">PLAYER</div>
+  <div style="color:var(--muted);font-size:.85rem;letter-spacing:3px;margin-top:.4rem" id="callout-nat"></div>
+  <div style="font-family:'Bebas Neue';font-size:1.8rem;margin-top:.3rem" id="callout-role"></div>
+  <div class="callout-bar"><div class="callout-bar-fill"></div></div>
+ </div>
+</div>
+<div class="hammer-anim" id="hammer-anim">
+ <div class="confetti" id="confetti"></div>
+ <div class="ha-ring"><div class="ha-emoji">🔨</div></div>
+ <div class="ha-sold">SOLD!</div>
+ <div class="ha-player" id="ha-player"></div>
+ <div class="ha-price" id="ha-price"></div>
+ <div class="ha-team" id="ha-team"></div>
+</div>
+<div class="unsold-anim" id="unsold-anim">
+ <div class="ua-x">❌</div><div class="ua-text">UNSOLD</div><div class="ua-name" id="ua-name"></div>
+</div>
+<div class="bid-toast" id="bid-toast"><div class="bt-name" id="bt-toast-name"></div><div class="bt-msg" id="bt-toast-msg"></div></div>
+<div class="hand-toast" id="hand-toast"></div>
+
+<!-- MIC MODAL -->
+<div id="mic-modal" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.88);backdrop-filter:blur(12px);align-items:center;justify-content:center;">
+ <div style="background:linear-gradient(135deg,#151525,#1c1c30);border:1px solid #252540;border-radius:20px;padding:2rem;max-width:360px;width:90%;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.7);animation:micModalIn .35s cubic-bezier(.34,1.56,.64,1)">
+  <div style="font-size:2.5rem;margin-bottom:.75rem" id="mic-icon">🎙️</div>
+  <div style="font-family:'Bebas Neue';font-size:1.6rem;letter-spacing:3px;color:var(--gold);margin-bottom:.5rem">ENABLE VOICE CHAT</div>
+  <div style="color:var(--muted);font-size:.82rem;line-height:1.6;margin-bottom:1.25rem">Click <b style="color:#eeeeff">Allow Microphone</b> below, then allow in the browser popup.</div>
+  <div style="display:flex;gap:.6rem">
+   <button onclick="closeMicModal()" style="flex:1;padding:11px;background:transparent;border:1px solid #252540;border-radius:9px;color:var(--muted);font-family:'Bebas Neue';font-size:1rem;letter-spacing:2px;cursor:pointer">CANCEL</button>
+   <button onclick="confirmMicPermission()" id="mic-allow-btn" style="flex:2;padding:11px;background:linear-gradient(135deg,#00e676,#00b85a);border:none;border-radius:9px;color:#000;font-family:'Bebas Neue';font-size:1.1rem;letter-spacing:2px;cursor:pointer;font-weight:700">🎙️ ALLOW MIC</button>
+  </div>
+  <div id="mic-status" style="margin-top:.75rem;font-size:.75rem;color:var(--muted);min-height:18px"></div>
+ </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════════
+const TEAMS=[
+  {id:'MI',name:'Mumbai Indians',flag:'🔵',color:'#004BA0'},
+  {id:'CSK',name:'Chennai Super Kings',flag:'🟡',color:'#F9CD05'},
+  {id:'RCB',name:'Royal Challengers',flag:'🔴',color:'#EC1C24'},
+  {id:'KKR',name:'Kolkata Knight Riders',flag:'🟣',color:'#3A225D'},
+  {id:'DC',name:'Delhi Capitals',flag:'🔵',color:'#0278C9'},
+  {id:'PBKS',name:'Punjab Kings',flag:'🔴',color:'#AA4545'},
+  {id:'RR',name:'Rajasthan Royals',flag:'🩷',color:'#E73373'},
+  {id:'SRH',name:'Sunrisers Hyderabad',flag:'🟠',color:'#FF822A'},
+  {id:'GT',name:'Gujarat Titans',flag:'⚫',color:'#0B4973'},
+  {id:'LSG',name:'Lucknow SG',flag:'🟤',color:'#A72056'},
+];
+const FLAG={IN:'🇮🇳',AU:'🇦🇺',ENG:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',SA:'🇿🇦',WI:'🏝️',NZ:'🇳🇿',PAK:'🇵🇰',SL:'🇱🇰',AFG:'🇦🇫',BAN:'🇧🇩',ZIM:'🇿🇼',IRE:'🇮🇪'};
+const AV=['🧔','👨','👱','🧑','👴','🎩','🧢','👲'];
+function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+function pick(a){return a[rnd(0,a.length-1)];}
+
+const RAW_PLAYERS=[
+  ['Virat Kohli','BAT','IN',200,59.1,138,254],['Rohit Sharma','BAT','IN',200,56.4,140,264],
+  ['Shubman Gill','BAT','IN',200,54.2,142,149],['Yashasvi Jaiswal','BAT','IN',200,54.8,163,209],
+  ['Suryakumar Yadav','BAT','IN',200,47.5,187,117],['KL Rahul','WK','IN',200,47.3,136,132],
+  ['Sanju Samson','WK','IN',150,40.2,148,119],['Ruturaj Gaikwad','BAT','IN',150,45.6,140,108],
+  ['Ishan Kishan','WK','IN',150,35.8,132,99],['Rishabh Pant','WK','IN',200,38.6,152,128],
+  ['MS Dhoni','WK','IN',200,38.4,136,84],['Tilak Varma','BAT','IN',150,48.2,145,120],
+  ['Rinku Singh','BAT','IN',150,52.1,156,67],['Shreyas Iyer','BAT','IN',200,43.2,128,96],
+  ['Hardik Pandya','AR','IN',200,32.4,152,91],['Ravindra Jadeja','AR','IN',200,34.2,132,112],
+  ['Axar Patel','AR','IN',100,26.8,144,93],['Washington Sundar','AR','IN',75,24.4,138,86],
+  ['Shardul Thakur','AR','IN',100,22.4,142,67],['Venkatesh Iyer','AR','IN',100,36.4,152,104],
+  ['Abhishek Sharma','AR','IN',150,44.2,186,135],['Nitish Kumar Reddy','AR','IN',100,38.6,148,74],
+  ['Jasprit Bumrah','BOWL','IN',200,0,0,0],['Mohammed Shami','BOWL','IN',200,0,0,0],
+  ['Kuldeep Yadav','BOWL','IN',200,0,0,0],['Arshdeep Singh','BOWL','IN',200,0,0,0],
+  ['Yuzvendra Chahal','BOWL','IN',100,0,0,0],['Mohammed Siraj','BOWL','IN',100,0,0,0],
+  ['Ravichandran Ashwin','BOWL','IN',100,0,0,0],['Bhuvneshwar Kumar','BOWL','IN',75,0,0,0],
+  ['Harshal Patel','BOWL','IN',75,0,0,0],['Prasidh Krishna','BOWL','IN',75,0,0,0],
+  ['Ravi Bishnoi','BOWL','IN',75,0,0,0],['Varun Chakaravarthy','BOWL','IN',75,0,0,0],
+  ['T Natarajan','BOWL','IN',75,0,0,0],['Harshit Rana','BOWL','IN',75,0,0,0],
+  ['Travis Head','BAT','AU',200,50.8,156,163],['David Warner','BAT','AU',150,44.6,140,153],
+  ['Glenn Maxwell','AR','AU',200,34.6,162,154],['Marcus Stoinis','AR','AU',150,38.2,152,140],
+  ['Mitchell Marsh','AR','AU',150,42.4,154,102],['Pat Cummins','AR','AU',200,26.8,142,66],
+  ['Cameron Green','AR','AU',200,36.4,158,121],['Mitchell Starc','BOWL','AU',200,0,0,0],
+  ['Josh Hazlewood','BOWL','AU',150,0,0,0],['Adam Zampa','BOWL','AU',100,0,0,0],
+  ['Jake Fraser-McGurk','BAT','AU',100,42.4,188,116],['Steve Smith','BAT','AU',75,42.2,128,103],
+  ['Jos Buttler','WK','ENG',200,38.6,148,124],['Phil Salt','WK','ENG',200,36.4,168,119],
+  ['Ben Stokes','AR','ENG',200,36.4,142,182],['Sam Curran','AR','ENG',200,26.8,138,95],
+  ['Liam Livingstone','AR','ENG',200,36.4,166,103],['Harry Brook','BAT','ENG',200,52.4,158,186],
+  ['Mark Wood','BOWL','ENG',150,0,0,0],['Jofra Archer','BOWL','ENG',200,0,0,0],
+  ['Andre Russell','AR','WI',200,28.4,188,121],['Sunil Narine','AR','WI',100,22.4,174,109],
+  ['Nicholas Pooran','WK','WI',200,36.4,180,104],['Shimron Hetmyer','BAT','WI',150,40.2,162,139],
+  ['Kagiso Rabada','BOWL','SA',200,0,0,0],['Anrich Nortje','BOWL','SA',200,0,0,0],
+  ['Quinton de Kock','WK','SA',150,44.2,136,135],['Heinrich Klaasen','WK','SA',200,49.8,180,174],
+  ['David Miller','BAT','SA',150,40.8,156,116],['Marco Jansen','AR','SA',150,24.4,148,48],
+  ['Aiden Markram','BAT','SA',150,40.2,148,152],['Rashid Khan','BOWL','AFG',200,0,0,0],
+  ['Mujeeb ur Rahman','BOWL','AFG',100,0,0,0],['Fazalhaq Farooqi','BOWL','AFG',150,0,0,0],
+  ['Rahmanullah Gurbaz','WK','AFG',150,42.4,168,121],['Noor Ahmad','BOWL','AFG',150,0,0,0],
+  ['Babar Azam','BAT','PAK',200,52.8,130,122],['Shaheen Shah Afridi','BOWL','PAK',200,0,0,0],
+  ['Wanindu Hasaranga','AR','SL',200,24.4,158,66],['Matheesha Pathirana','BOWL','SL',200,0,0,0],
+  ['Tim David','BAT','SL',200,50.4,180,96],['Kane Williamson','BAT','NZ',75,48.2,128,148],
+  ['Lockie Ferguson','BOWL','NZ',150,0,0,0],['Trent Boult','BOWL','NZ',100,0,0,0],
+  ['Rachin Ravindra','AR','NZ',150,46.4,152,240],['Devon Conway','WK','NZ',75,48.4,132,99],
+  ['Mustafizur Rahman','BOWL','BAN',100,0,0,0],['Shakib Al Hasan','AR','BAN',75,28.4,132,84],
+  ['Vaibhav Suryavanshi','BAT','IN',150,42.6,170,105],['Devdutt Padikkal','BAT','IN',75,38.4,138,101],
+  ['Riyan Parag','AR','IN',75,34.8,158,84],['Rajat Patidar','BAT','IN',75,40.2,162,112],
+  ['Dewald Brevis','BAT','SA',100,42.4,172,108],['Ryan Rickelton','WK','SA',100,42.4,148,129],
+  ['Heinrich Klaasen','WK','SA',200,49.8,180,174],['Finn Allen','WK','NZ',100,36.4,168,96],
+  ['Prithvi Shaw','BAT','IN',75,35.6,154,99],['Shivam Dube','AR','IN',75,42.8,152,95],
+  ['Krunal Pandya','AR','IN',75,26.4,138,86],['Deepak Chahar','AR','IN',100,20.2,128,69],
+  ['Avesh Khan','BOWL','IN',75,0,0,0],['Akash Deep','BOWL','IN',40,0,0,0],
+  ['Khaleel Ahmed','BOWL','IN',40,0,0,0],['Umesh Yadav','BOWL','IN',40,0,0,0],
+  ['Rovman Powell','BAT','WI',100,32.8,182,85],['Kyle Mayers','AR','WI',75,38.2,148,210],
+  ['Alzarri Joseph','BOWL','WI',100,0,0,0],['Faf du Plessis','BAT','SA',100,36.4,136,96],
+  ['Sikandar Raza','AR','ZIM',40,28.4,148,121],['Blessing Muzarabani','BOWL','ZIM',40,0,0,0],
+  ['Saim Ayub','BAT','PAK',100,46.2,152,113],['Fakhar Zaman','BAT','PAK',75,42.6,146,193],
+];
+
+const seen=new Set();
+const ALL_PLAYERS=[];
+let _pid=1;
+RAW_PLAYERS.forEach(([name,role,nat,base,bavg,bsr,bhs])=>{
+  if(seen.has(name))return; seen.add(name);
+  ALL_PLAYERS.push({
+    id:_pid++, name, role, nat, flag:FLAG[nat]||'🌍', avatar:pick(AV), base,
+    batting:{avg:bavg||rnd(15,30), sr:bsr||rnd(100,140), hs:bhs||rnd(30,80)},
+    bowling:{avg:role==='BOWL'?rnd(20,32):0, eco:role==='BOWL'||role==='AR'?(rnd(68,105)/10).toFixed(1):'-', wkts:role==='BOWL'?rnd(40,220):role==='AR'?rnd(10,60):0},
+    status:'available', soldTo:null, soldPrice:0
+  });
+});
+setTimeout(()=>{const e=document.getElementById('lobby-count');if(e)e.textContent=ALL_PLAYERS.length;},50);
+
+// ═══════════════════════════════════════════════════════════════════
+// WEBSOCKET
+// ═══════════════════════════════════════════════════════════════════
+let ws=null;
+let wsReady=false;
+const msgQueue=[];
+
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  const url=`${proto}://${location.host}`;
+  const bar=document.getElementById('conn-bar');
+  bar.className='conn-bar connecting';
+  bar.textContent='Connecting to server…';
+
+  ws=new WebSocket(url);
+  ws.onopen=()=>{
+    wsReady=true;
+    bar.style.display='none';
+    // Flush queued messages
+    msgQueue.forEach(m=>ws.send(JSON.stringify(m)));
+    msgQueue.length=0;
+    // Request room list
+    wsSend({type:'GET_ROOMS'});
+  };
+  ws.onmessage=e=>handleServerMsg(JSON.parse(e.data));
+  ws.onclose=()=>{
+    wsReady=false;
+    bar.className='conn-bar error';
+    bar.textContent='Disconnected — reconnecting…';
+    setTimeout(connectWS, 2000);
+  };
+  ws.onerror=()=>{};
+}
+function wsSend(msg){
+  if(wsReady && ws.readyState===1) ws.send(JSON.stringify(msg));
+  else msgQueue.push(msg);
+}
+connectWS();
+
+// Room list auto-refresh
+setInterval(()=>{
+  if(wsReady && document.getElementById('join-form')?.style.display!=='none'){
+    wsSend({type:'GET_ROOMS'});
+  }
+},3000);
+
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let state={
+  myId: crypto.randomUUID(),
+  myName:'', myTeam:'', roomId:'', roomName:'',
+  isHost:false, isBidder:false,
+  room:null,          // full room meta from server
+  auctionChat:[], currentRpTab:'chat',
+  currentPlayerIdx:-1, currentBid:0, currentBidder:null,
+  myBidAmount:0, timerSecs:15, timerInterval:null,
+  teamBudgets:{}, teamSquads:{}, auctionRunning:false,
+  bots:{}, botIQ:'smart',
+};
+TEAMS.forEach(t=>{state.teamBudgets[t.id]=120; state.teamSquads[t.id]=[];});
+
+// ═══════════════════════════════════════════════════════════════════
+// SERVER MESSAGE HANDLER
+// ═══════════════════════════════════════════════════════════════════
+function handleServerMsg(msg){
+  switch(msg.type){
+
+    case 'ROOM_LIST':
+      renderRoomList(msg.rooms); break;
+
+    case 'ROOM_CREATED':
+      state.roomId=msg.roomId; state.room=msg.room;
+      state.isBidder=true; state.isHost=true;
+      TEAMS.forEach(t=>{state.teamBudgets[t.id]=msg.room.budget; state.teamSquads[t.id]=[];});
+      enterWaiting(); break;
+
+    case 'JOINED':
+      state.room=msg.room; state.isBidder=msg.isBidder;
+      state.roomId=msg.room.id; state.roomName=msg.room.name;
+      TEAMS.forEach(t=>{state.teamBudgets[t.id]=msg.room.budget; state.teamSquads[t.id]=[];});
+      if(msg.room.status==='live') _enterAuction();
+      else enterWaiting();
+      break;
+
+    case 'ERROR':
+      alert(msg.msg); break;
+
+    case 'BIDDER_JOINED':
+    case 'SPECTATOR_JOINED':
+    case 'PLAYER_LEFT':
+      state.room=msg.room;
+      renderWrPlayers();
+      addWrChat('SYSTEM', msg.type==='PLAYER_LEFT'
+        ? `${msg.name||'Someone'} left`
+        : `${msg.name} joined${msg.type==='SPECTATOR_JOINED'?' (spectating)':''}!`,'system');
+      break;
+
+    case 'SLOT_AVAILABLE':
+      state.room=msg.room;
+      renderWrPlayers();
+      showSlotBanner(); break;
+
+    case 'PROMOTED':
+      state.myTeam=msg.team; state.isBidder=true; state.room=msg.room;
+      document.getElementById('slot-banner').style.display='none';
+      document.getElementById('spectator-banner').style.display='none';
+      document.getElementById('wr-my-team').textContent=msg.team;
+      addWrChat('SYSTEM','🎉 You are now bidding as '+msg.team+'!','system');
+      renderWrPlayers(); break;
+
+    case 'AUCTION_START':
+      state.room=msg.room; _enterAuction(); break;
+
+    case 'WR_CHAT':
+      addWrChat(msg.fromName, msg.text); break;
+
+    case 'CALL_PLAYER':
+      callPlayer(msg.playerIdx); break;
+
+    case 'BID':
+      applyBid(msg.from, msg.fromTeam, msg.amount); break;
+
+    case 'SOLD':
+      clearTimer(); applySold(msg.playerIdx, msg.team, msg.price); break;
+
+    case 'UNSOLD':
+      clearTimer(); applyUnsold(msg.playerIdx); break;
+
+    case 'CHAT':
+      addAuctionChat(msg.fromName, msg.text, 'normal', msg.fromTeam); break;
+
+    case 'AUCTION_END':
+      showResults(); break;
+
+    case 'VOICE_JOIN': case 'VOICE_LEAVE': case 'VOICE_MIC':
+    case 'VOICE_HAND': case 'VOICE_ADMIN_MUTE': case 'VOICE_FLOOR':
+      if(!msg.peerId) msg.peerId=voicePeerId(msg.from);
+      handleVoiceMsg(msg); break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LOBBY
+// ═══════════════════════════════════════════════════════════════════
+function populateTeamSelects(){
+  ['create-team','join-team','slot-team'].forEach(id=>{
+    const s=document.getElementById(id); if(!s)return;
+    s.innerHTML=TEAMS.map(t=>`<option value="${t.id}">${t.flag} ${t.name}</option>`).join('');
+  });
+}
+populateTeamSelects();
+
+function lobbyTab(t){
+  document.querySelectorAll('.ltab').forEach((el,i)=>el.classList.toggle('active',['create','join'][i]===t));
+  document.getElementById('create-form').style.display=t==='create'?'flex':'none';
+  document.getElementById('join-form').style.display=t==='join'?'flex':'none';
+  if(t==='join') wsSend({type:'GET_ROOMS'});
+}
+
+function renderRoomList(rooms){
+  const rl=document.getElementById('room-list'); if(!rl)return;
+  const list=(rooms||[]).filter(r=>r.status!=='finished');
+  if(!list.length){
+    rl.innerHTML='<div style="text-align:center;color:var(--muted);padding:1rem;font-size:.85rem">No active rooms — create one!</div>';
+    return;
+  }
+  rl.innerHTML=list.map(r=>{
+    const bidders=Object.keys(r.bidders||{}).length;
+    const specs=Object.keys(r.spectators||{}).length;
+    const full=bidders>=r.maxBidders;
+    return `<div class="room-item" onclick="joinRoom('${r.id}')">
+      <div>
+        <div class="room-item-name">${r.name}</div>
+        <div class="room-item-info">${bidders}/2 bidders · ${specs} watching · ₹${r.budget}Cr</div>
+      </div>
+      <div class="badge ${r.status==='live'?'badge-live':full?'badge-full':'badge-waiting'}">
+        ${r.status==='live'?'LIVE':full?'FULL':'WAITING'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function createRoom(){
+  const name=document.getElementById('create-name').value.trim();
+  const team=document.getElementById('create-team').value;
+  const rname=document.getElementById('create-room-name').value.trim()||`${name}'s Auction`;
+  const budget=parseInt(document.getElementById('create-budget').value);
+  if(!name){alert('Enter your name');return;}
+  state.myName=name; state.myTeam=team;
+  wsSend({type:'CREATE_ROOM', playerId:state.myId, name, team, roomName:rname, budget});
+}
+
+function joinRoom(roomId){
+  const name=document.getElementById('join-name').value.trim();
+  const team=document.getElementById('join-team').value;
+  if(!name){alert('Enter your name');return;}
+  state.myName=name; state.myTeam=team;
+  wsSend({type:'JOIN_ROOM', roomId, playerId:state.myId, name, team});
+}
+
+function joinByCode(){
+  const code=document.getElementById('join-code').value.trim().toUpperCase();
+  if(code) joinRoom(code);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// WAITING ROOM
+// ═══════════════════════════════════════════════════════════════════
+function enterWaiting(){
+  showScreen('waiting');
+  document.getElementById('wr-room-name').textContent=state.room.name;
+  document.getElementById('wr-code').textContent=state.room.id;
+  document.getElementById('wr-my-team').textContent=state.isBidder?state.myTeam:'SPECTATOR';
+  if(state.isHost){
+    document.getElementById('start-btn').style.display='block';
+    document.getElementById('bot-section').style.display='block';
+    renderBotGrid();
+  }
+  if(!state.isBidder){
+    document.getElementById('spectator-banner').style.display='block';
+  }
+  renderWrPlayers();
+  addWrChat('SYSTEM',`Welcome to ${state.room.name}! Code: ${state.room.id}`,'system');
+}
+
+function renderWrPlayers(){
+  const room=state.room; if(!room) return;
+  const bl=document.getElementById('wr-bidder-list');
+  const sl=document.getElementById('wr-spec-list');
+  bl.innerHTML=Object.entries(room.bidders||{}).map(([id,p])=>{
+    const t=TEAMS.find(x=>x.id===p.team)||{flag:'🏏',color:'#555'};
+    return `<div class="wr-player-item">
+      <div class="wr-avatar" style="border-color:${t.color};background:${t.color}22">${t.flag}</div>
+      <div><div style="font-weight:600">${p.name}${p.isHost?' 👑':''}</div><div style="font-size:.72rem;color:var(--muted)">${t.name}</div></div>
+    </div>`;
+  }).join('')||'<div style="color:var(--muted);font-size:.78rem;padding:.5rem">No bidders yet</div>';
+
+  const specs=Object.entries(room.spectators||{});
+  sl.innerHTML=specs.length
+    ? specs.map(([id,p])=>`<div style="padding:6px 10px;font-size:.78rem;color:var(--muted)">👁️ ${p.name}</div>`).join('')
+    : '<div style="color:var(--muted);font-size:.78rem;padding:.5rem">No spectators</div>';
+}
+
+function showSlotBanner(){
+  const b=document.getElementById('slot-banner');
+  b.style.display='block';
+  document.getElementById('spectator-banner').style.display='none';
+  addWrChat('SYSTEM','🎉 A bidder slot just opened! You can now join as a bidder.','system');
+}
+
+function claimSlot(){
+  const team=document.getElementById('slot-team').value;
+  wsSend({type:'PROMOTE_TO_BIDDER', playerId:state.myId, name:state.myName, team, budget:state.room?.budget||120});
+  state.myTeam=team;
+}
+
+function leaveRoom(){
+  wsSend({type:'LEAVE_ROOM'}); leaveVoice(); showScreen('lobby'); wsSend({type:'GET_ROOMS'});
+}
+
+function startAuction(){
+  if(!state.isHost) return;
+  wsSend({type:'AUCTION_START'});
+}
+
+function relay(type, data={}){
+  wsSend({type, fromName:state.myName, fromTeam:state.myTeam, playerId:state.myId, ...data});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AUCTION ENTER
+// ═══════════════════════════════════════════════════════════════════
+function _enterAuction(){
+  showScreen('auction');
+  state.auctionRunning=true;
+  document.getElementById('atb-room').textContent=state.room?.name||state.roomName;
+  const hc=document.getElementById('host-controls');
+  if(hc) hc.style.display=state.isHost?'flex':'none';
+  const sp=document.getElementById('spec-pill');
+  if(sp) sp.style.display=state.isBidder?'none':'block';
+  // Disable bid button for spectators
+  const bb=document.getElementById('place-bid-btn');
+  if(bb) bb.disabled=!state.isBidder;
+  document.getElementById('my-budget-val').textContent='₹'+(state.teamBudgets[state.myTeam]||120)+'Cr';
+  renderPool(); rpTab('chat'); renderTeamsPanel();
+  addAuctionChat('SYSTEM','🏏 Auction started! Let the bidding begin!','system');
+  const bc=Object.keys(state.bots).length;
+  if(bc>0) addAuctionChat('SYSTEM',`🤖 ${bc} AI bot${bc>1?'s':''} are competing!`,'system');
+  if(!state.isBidder) addAuctionChat('SYSTEM','👁️ You are spectating — watching live but cannot bid.','system');
+  if(state.isHost) setTimeout(()=>nextPlayer(),1200);
+  updateStats();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PLAYER POOL
+// ═══════════════════════════════════════════════════════════════════
+let activeFilters=new Set();
+function toggleFilter(role){activeFilters.has(role)?activeFilters.delete(role):activeFilters.add(role); renderPool();}
+function renderPool(){
+  const q=(document.getElementById('pool-search')?.value||'').toLowerCase();
+  const pool=document.getElementById('player-pool'); if(!pool) return;
+  const vis=ALL_PLAYERS.filter(p=>{
+    if(activeFilters.size&&!activeFilters.has(p.role)) return false;
+    if(q&&!p.name.toLowerCase().includes(q)) return false;
+    return true;
+  }).slice(0,120);
+  pool.innerHTML=vis.map(p=>{
+    const cur=state.currentPlayerIdx>=0&&ALL_PLAYERS[state.currentPlayerIdx]?.id===p.id;
+    const done=p.status==='sold'||p.status==='unsold';
+    return `<div class="pool-player${cur?' current':''}${done?' sold':''}" onclick="hostPickPlayer(${p.id})">
+      <div class="pp-avatar">${p.flag}</div>
+      <div style="flex:1;min-width:0">
+        <div class="pp-name">${p.name}</div>
+        <div class="pp-role-tag"><span class="role-tag rt-${p.role}">${p.role}</span> ${p.nat}</div>
+      </div>
+      <div class="pp-base">${p.status==='sold'?'✓'+p.soldPrice+'L':p.status==='unsold'?'✗':'₹'+p.base+'L'}</div>
+    </div>`;
+  }).join('');
+}
+function hostPickPlayer(id){
+  if(!state.isHost||!state.auctionRunning) return;
+  const idx=ALL_PLAYERS.findIndex(p=>p.id===id);
+  if(idx<0||ALL_PLAYERS[idx].status!=='available') return;
+  clearTimer(); relay('CALL_PLAYER',{playerIdx:idx}); callPlayer(idx);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AUCTION FLOW
+// ═══════════════════════════════════════════════════════════════════
+function nextPlayer(){
+  if(!state.isHost) return;
+  const idx=ALL_PLAYERS.findIndex(p=>p.status==='available');
+  if(idx<0){relay('AUCTION_END');showResults();return;}
+  relay('CALL_PLAYER',{playerIdx:idx}); callPlayer(idx);
+}
+
+function callPlayer(idx){
+  state.currentPlayerIdx=idx;
+  const p=ALL_PLAYERS[idx];
+  state.currentBid=p.base; state.currentBidder=null;
+  state.myBidAmount=p.base; updateMyBidVal();
+  // Callout overlay
+  document.getElementById('callout-name').textContent=p.name;
+  document.getElementById('callout-nat').textContent=p.flag+' '+p.nat;
+  document.getElementById('callout-role').textContent=({BAT:'BATSMAN',BOWL:'BOWLER',AR:'ALL-ROUNDER',WK:'WICKET KEEPER'}[p.role]);
+  const co=document.getElementById('player-callout');
+  co.querySelector('.callout-bar').innerHTML='<div class="callout-bar-fill"></div>';
+  co.classList.add('show');
+  setTimeout(()=>{
+    co.classList.remove('show');
+    showPlayerOnStage(p); startTimer(); updateStats(); renderPool();
+    if(state.isHost) setTimeout(scheduleBotBids,1500);
+  },2200);
+}
+
+function showPlayerOnStage(p){
+  const card=document.getElementById('player-card');
+  document.getElementById('no-player-msg').style.display='none';
+  card.style.display='block'; card.classList.remove('entered','exiting');
+  document.getElementById('ps-cat').textContent=({BAT:'BATSMAN',BOWL:'BOWLER',AR:'ALL-ROUNDER',WK:'WICKET KEEPER'}[p.role]);
+  document.getElementById('ps-avatar').textContent=p.flag+' '+p.avatar;
+  document.getElementById('ps-name').textContent=p.name;
+  document.getElementById('ps-meta').textContent=`${p.nat} · ${p.role}`;
+  document.getElementById('ps-base').textContent='₹'+p.base+'L';
+  let stats='';
+  if(p.role==='BAT'||p.role==='WK'){
+    stats=`<div class="ps-stat"><div class="ps-stat-val">${p.batting.avg}</div><div class="ps-stat-lbl">AVG</div></div>
+           <div class="ps-stat"><div class="ps-stat-val">${p.batting.sr}</div><div class="ps-stat-lbl">S/R</div></div>
+           <div class="ps-stat"><div class="ps-stat-val">${p.batting.hs}</div><div class="ps-stat-lbl">H/S</div></div>`;
+  } else if(p.role==='BOWL'){
+    stats=`<div class="ps-stat"><div class="ps-stat-val">${p.bowling.avg}</div><div class="ps-stat-lbl">AVG</div></div>
+           <div class="ps-stat"><div class="ps-stat-val">${p.bowling.eco}</div><div class="ps-stat-lbl">ECO</div></div>
+           <div class="ps-stat"><div class="ps-stat-val">${p.bowling.wkts}</div><div class="ps-stat-lbl">WKTS</div></div>`;
+  } else {
+    stats=`<div class="ps-stat"><div class="ps-stat-val">${p.batting.avg}</div><div class="ps-stat-lbl">BAT</div></div>
+           <div class="ps-stat"><div class="ps-stat-val">${p.bowling.eco}</div><div class="ps-stat-lbl">ECO</div></div>
+           <div class="ps-stat"><div class="ps-stat-val">${p.bowling.wkts}</div><div class="ps-stat-lbl">WKTS</div></div>`;
+  }
+  document.getElementById('ps-stats').innerHTML=stats;
+  document.getElementById('bid-display').style.display='flex';
+  document.getElementById('timer-wrap').style.display='block';
+  document.getElementById('bid-amount').textContent='₹'+p.base+'L';
+  document.getElementById('bt-flag').textContent='—';
+  document.getElementById('bt-name').textContent='No bids';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>card.classList.add('entered')));
+}
+
+function startTimer(){
+  clearTimer(); state.timerSecs=15; updateTimerUI();
+  state.timerInterval=setInterval(()=>{
+    state.timerSecs--; updateTimerUI();
+    if(state.timerSecs<=0){
+      clearTimer();
+      if(state.isHost){ if(state.currentBidder) hammer(); else markUnsold(); }
+    }
+  },1000);
+}
+function clearTimer(){clearInterval(state.timerInterval); state.timerInterval=null;}
+function updateTimerUI(){
+  const pct=(state.timerSecs/15)*100;
+  document.getElementById('timer-fill').style.width=pct+'%';
+  document.getElementById('timer-num').textContent=state.timerSecs;
+  document.getElementById('timer-num').style.color=state.timerSecs<=5?'var(--red)':state.timerSecs<=8?'var(--gold)':'var(--text)';
+}
+
+function placeBid(){
+  if(!state.isBidder){showToast('Spectating','You cannot bid while spectating');return;}
+  if(state.currentPlayerIdx<0) return;
+  const budget=state.teamBudgets[state.myTeam]*100;
+  if(state.myBidAmount>budget){showToast('Over budget!','Not enough funds');return;}
+  if(state.myBidAmount<=state.currentBid){showToast('Too low!','Must beat current bid');return;}
+  relay('BID',{amount:state.myBidAmount, team:state.myTeam});
+  applyBid(state.myId, state.myTeam, state.myBidAmount);
+}
+
+function applyBid(fromId, team, amount){
+  state.currentBid=amount; state.currentBidder=team;
+  const el=document.getElementById('bid-amount');
+  el.style.animation='none'; requestAnimationFrame(()=>{el.style.animation=''; el.textContent=fmtP(amount);});
+  const t=TEAMS.find(x=>x.id===team)||{flag:'?'};
+  document.getElementById('bt-flag').textContent=t.flag;
+  document.getElementById('bt-name').textContent=team;
+  if(state.isHost){clearTimer(); startTimer();}
+  state.myBidAmount=nextBid(amount); updateMyBidVal();
+  showToast(t.flag+' '+team+' bids!', fmtP(amount));
+  if(!fromId.startsWith('bot-')) addAuctionChat(team, `Bids ${fmtP(amount)} for ${ALL_PLAYERS[state.currentPlayerIdx]?.name||'player'}!`,'normal',team);
+  renderTeamsPanel();
+  if(state.isHost) setTimeout(scheduleBotBids,800);
+}
+
+function fmtP(v){return v>=100?'₹'+(v/100).toFixed(v%100?1:0)+'Cr':'₹'+v+'L';}
+function nextBid(c){if(c<100)return c+10; if(c<500)return c+25; if(c<1000)return c+50; return c+100;}
+function adjustBid(l){state.myBidAmount+=l; if(state.myBidAmount<state.currentBid+5)state.myBidAmount=state.currentBid+5; updateMyBidVal();}
+function updateMyBidVal(){
+  document.getElementById('my-bid-val').textContent=fmtP(state.myBidAmount);
+  document.getElementById('my-budget-val').textContent='₹'+state.teamBudgets[state.myTeam]+'Cr';
+}
+
+function hammer(){
+  if(state.currentPlayerIdx<0||!state.currentBidder) return;
+  clearTimer();
+  relay('SOLD',{playerIdx:state.currentPlayerIdx, team:state.currentBidder, price:state.currentBid});
+  applySold(state.currentPlayerIdx, state.currentBidder, state.currentBid);
+}
+function markUnsold(){
+  if(state.currentPlayerIdx<0) return; clearTimer();
+  relay('UNSOLD',{playerIdx:state.currentPlayerIdx}); applyUnsold(state.currentPlayerIdx);
+}
+function skipPlayer(){markUnsold();}
+
+function applySold(idx, team, price){
+  const p=ALL_PLAYERS[idx]; p.status='sold'; p.soldTo=team; p.soldPrice=price;
+  state.teamBudgets[team]=Math.max(0, state.teamBudgets[team]-(price/100));
+  if(!state.teamSquads[team]) state.teamSquads[team]=[];
+  state.teamSquads[team].push({name:p.name, role:p.role, price});
+  document.getElementById('ha-player').textContent=p.name;
+  document.getElementById('ha-price').textContent=fmtP(price);
+  const t=TEAMS.find(x=>x.id===team)||{flag:'🏏',name:team};
+  document.getElementById('ha-team').textContent=t.flag+' '+t.name;
+  launchConfetti(); document.getElementById('hammer-anim').classList.add('show');
+  addAuctionChat('SYSTEM',`🔨 ${p.name} SOLD to ${t.name} for ${fmtP(price)}!`,'system');
+  updateStats(); renderPool(); renderTeamsPanel(); renderSoldPanel();
+  setTimeout(()=>{
+    document.getElementById('hammer-anim').classList.remove('show');
+    exitStage(); state.currentPlayerIdx=-1; state.currentBidder=null;
+    if(state.isHost) setTimeout(()=>nextPlayer(),1200);
+  },3000);
+}
+
+function applyUnsold(idx){
+  const p=ALL_PLAYERS[idx]; p.status='unsold';
+  document.getElementById('ua-name').textContent=p.name;
+  document.getElementById('unsold-anim').classList.add('show');
+  addAuctionChat('SYSTEM',`❌ ${p.name} goes UNSOLD`,'system');
+  updateStats(); renderPool();
+  setTimeout(()=>{
+    document.getElementById('unsold-anim').classList.remove('show');
+    exitStage(); state.currentPlayerIdx=-1; state.currentBidder=null;
+    if(state.isHost) setTimeout(()=>nextPlayer(),1000);
+  },2000);
+}
+
+function exitStage(){
+  const card=document.getElementById('player-card'); card.classList.add('exiting');
+  setTimeout(()=>{card.style.display='none'; card.classList.remove('entered','exiting');
+    document.getElementById('bid-display').style.display='none';
+    document.getElementById('timer-wrap').style.display='none';
+    document.getElementById('no-player-msg').style.display='block';},400);
+}
+
+function updateStats(){
+  let s=0,u=0,r=0; ALL_PLAYERS.forEach(p=>{if(p.status==='sold')s++;else if(p.status==='unsold')u++;else r++;});
+  document.getElementById('atb-sold').textContent=s;
+  document.getElementById('atb-unsold').textContent=u;
+  document.getElementById('atb-remain').textContent=r;
+}
+
+function showResults(){
+  showScreen('results');
+  document.getElementById('results-grid').innerHTML=TEAMS.map(t=>{
+    const sq=state.teamSquads[t.id]||[]; const spent=120-state.teamBudgets[t.id];
+    return `<div class="result-team">
+      <div class="rt-head"><span style="font-size:1.3rem">${t.flag}</span><div><div style="font-family:'Bebas Neue';font-size:1.1rem">${t.id}</div><div style="font-size:.65rem;color:var(--muted)">₹${spent.toFixed(1)}Cr · ${sq.length} players</div></div></div>
+      ${sq.map(s=>`<div class="rt-player-item"><span>${s.name} <span class="role-tag rt-${s.role}">${s.role}</span></span><span style="color:var(--gold)">${fmtP(s.price)}</span></div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RIGHT PANEL
+// ═══════════════════════════════════════════════════════════════════
+let currentRpTab='chat';
+function rpTab(t){
+  currentRpTab=t;
+  document.querySelectorAll('.rp-tab').forEach(el=>el.classList.toggle('active',el.textContent.toLowerCase().trim()===t));
+  const f=document.getElementById('chat-footer'); if(f) f.style.display=t==='chat'?'flex':'none';
+  if(t==='chat') renderChatPanel(); else if(t==='teams') renderTeamsPanel(); else renderSoldPanel();
+}
+function renderChatPanel(){
+  const b=document.getElementById('rp-body');
+  b.innerHTML='<div id="chat-inner" style="display:flex;flex-direction:column;gap:.3rem"></div>';
+  const inner=document.getElementById('chat-inner');
+  inner.innerHTML=state.auctionChat.map(chatHtml).join('');
+  inner.scrollTop=inner.scrollHeight;
+}
+function renderTeamsPanel(){
+  const b=document.getElementById('rp-body'); if(currentRpTab!=='teams') return;
+  b.innerHTML=TEAMS.map(t=>{
+    const sq=state.teamSquads[t.id]||[]; const budget=state.teamBudgets[t.id]||120; const isMe=t.id===state.myTeam;
+    return `<div class="team-row${isMe?' me':''}">
+      <div class="tr-flag">${t.flag}</div>
+      <div class="tr-info"><div class="tr-name">${t.id}${isMe?' (You)':''}</div><div class="tr-stats">${sq.length} players</div></div>
+      <div style="text-align:right"><div class="tr-bval">₹${budget.toFixed(1)}Cr</div><div class="tr-blbl">LEFT</div></div>
+    </div>`;
+  }).join('');
+}
+function renderSoldPanel(){
+  const b=document.getElementById('rp-body'); if(currentRpTab!=='sold') return;
+  const sold=ALL_PLAYERS.filter(p=>p.status==='sold').reverse();
+  if(!sold.length){b.innerHTML='<div style="color:var(--muted);text-align:center;padding:2rem;font-size:.8rem">No players sold yet</div>';return;}
+  b.innerHTML=sold.map(p=>`<div class="sold-item">
+    <div style="font-size:1.2rem">${p.flag}</div>
+    <div style="flex:1;min-width:0"><div class="si-name">${p.name}</div><div class="si-role"><span class="role-tag rt-${p.role}">${p.role}</span></div></div>
+    <div><div class="si-price">${fmtP(p.soldPrice)}</div><div class="si-team">${p.soldTo}</div></div>
+  </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CHAT
+// ═══════════════════════════════════════════════════════════════════
+function chatHtml(m){
+  const isMe=m.teamId===state.myTeam; const isSys=m.type==='system';
+  const t=TEAMS.find(x=>x.id===m.teamId)||{flag:'💬',color:'#555'};
+  return `<div class="chat-msg${isMe?' me':''}${isSys?' system':''}">
+    ${!isSys?`<div class="cm-author" style="color:${t.color||'var(--muted)'}">${t.flag} ${m.author}</div>`:''}
+    <div class="cm-text">${m.text}</div><div class="cm-time">${m.time}</div></div>`;
+}
+function addAuctionChat(author, text, type='normal', teamId=null){
+  const t=new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+  const m={author, text, time:t, type, teamId:teamId||state.myTeam};
+  state.auctionChat.push(m);
+  if(currentRpTab==='chat'){
+    const inner=document.getElementById('chat-inner');
+    if(inner){inner.innerHTML+=chatHtml(m); inner.scrollTop=inner.scrollHeight;}
+  }
+}
+function sendAuctionChat(){
+  const inp=document.getElementById('auc-chat-input'); const txt=inp.value.trim(); if(!txt) return;
+  relay('CHAT',{text:txt}); addAuctionChat(state.myName, txt, 'normal', state.myTeam); inp.value='';
+}
+function addWrChat(author, text, type='normal'){
+  const t=new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+  const msgs=document.getElementById('wr-chat-msgs'); if(!msgs) return;
+  const div=document.createElement('div');
+  div.className='chat-msg'+(author===state.myName&&type!=='system'?' me':'')+(type==='system'?' system':'');
+  div.innerHTML=`${type!=='system'?`<div class="cm-author">${author}</div>`:''}
+    <div class="cm-text">${text}</div><div class="cm-time">${t}</div>`;
+  msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
+}
+function sendWrChat(){
+  const inp=document.getElementById('wr-chat-input'); const txt=inp.value.trim(); if(!txt) return;
+  relay('WR_CHAT',{text:txt}); addWrChat(state.myName, txt); inp.value='';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BOTS
+// ═══════════════════════════════════════════════════════════════════
+const BOT_NAMES={MI:'Jio Scout',CSK:'Thala Sensei',RCB:'Kohli Vision',KKR:'Eden Brain',DC:'Dilli AI',PBKS:'Punjab Pundit',RR:'Royals Scout',SRH:'Orange AI',GT:'Titans Scout',LSG:'Lucknow Brain'};
+const BPLAB={'balanced':'⚖️','aggressive':'🔥','conservative':'💰','value-hunter':'🎯','star-chaser':'⭐'};
+
+function setBotIQ(iq){
+  state.botIQ=iq;
+  document.querySelectorAll('.bi-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('bi-'+iq)?.classList.add('active');
+  Object.values(state.bots).forEach(b=>b.iq=iq);
+}
+function renderBotGrid(){
+  const taken=new Set(Object.values(state.room?.bidders||{}).map(p=>p.team));
+  taken.add(state.myTeam);
+  const grid=document.getElementById('bot-grid'); if(!grid) return;
+  let cnt=0;
+  grid.innerHTML=TEAMS.filter(t=>t.id!==state.myTeam).map(t=>{
+    const isBot=!!state.bots[t.id]; const isHuman=taken.has(t.id)&&!isBot;
+    if(isBot) cnt++;
+    const bot=state.bots[t.id];
+    return `<div class="bot-slot${isBot?' active':''}" onclick="${isHuman?'':isBot?`removeBot('${t.id}')`:`addBot('${t.id}')`}">
+      <div class="bot-dot"></div>
+      <div><div class="bot-name">${t.flag} ${t.id}</div><div class="bot-style">${isBot?(BPLAB[bot.personality]||'🤖')+' AI':isHuman?'👤 HUMAN':'Empty'}</div></div>
+      ${isBot?`<div class="bot-remove" onclick="event.stopPropagation();removeBot('${t.id}')">✕</div>`:''}
+    </div>`;
+  }).join('');
+  document.getElementById('bot-count-badge').textContent=cnt+' bot'+(cnt!==1?'s':'');
+}
+function addBot(tid){
+  if(state.bots[tid]) return;
+  const pers=pick(['balanced','aggressive','conservative','value-hunter','star-chaser']);
+  state.bots[tid]={name:BOT_NAMES[tid]||'AI Bot',team:tid,iq:state.botIQ,personality:pers,stubbornness:Math.random(),bidStreak:0,lastBidRound:-1};
+  addWrChat('SYSTEM',`🤖 ${BOT_NAMES[tid]} (${tid}) added — ${BPLAB[pers]} ${pers}`,'system');
+  renderBotGrid();
+}
+function removeBot(tid){delete state.bots[tid]; renderBotGrid();}
+function addAllBots(){
+  const taken=new Set(Object.values(state.room?.bidders||{}).map(p=>p.team)); taken.add(state.myTeam);
+  TEAMS.forEach(t=>{if(!taken.has(t.id)&&!state.bots[t.id]) addBot(t.id);});
+}
+
+let botRound=0;
+function scheduleBotBids(){
+  if(!state.isHost||state.currentPlayerIdx<0) return;
+  botRound++; const cr=botRound; const player=ALL_PLAYERS[state.currentPlayerIdx];
+  Object.values(state.bots).forEach(bot=>{
+    if(bot.team===state.currentBidder) return;
+    const delay=bot.personality==='aggressive'?rnd(600,1800):bot.personality==='conservative'?rnd(2000,5000):rnd(1000,3000);
+    setTimeout(()=>{
+      if(state.currentPlayerIdx<0||!state.auctionRunning) return;
+      if(bot.team===state.currentBidder||bot.lastBidRound===cr) return;
+      const dec=botDecide(bot,player);
+      if(dec.bid){
+        bot.lastBidRound=cr; bot.bidStreak++;
+        relay('BID',{amount:dec.amount,team:bot.team,fromName:bot.name,fromTeam:bot.team});
+        applyBid('bot-'+bot.team, bot.team, dec.amount);
+        addAuctionChat(bot.name, botTaunt(bot,dec,player),'normal',bot.team);
+        const bt=document.getElementById('bot-thinking'); const bn=document.getElementById('bot-thinking-name');
+        if(bt&&bn){bn.textContent='🤖 '+bot.name; bt.classList.add('show'); setTimeout(()=>bt.classList.remove('show'),1800);}
+      } else {bot.bidStreak=0;}
+    },delay);
+  });
+}
+
+function botDecide(bot,player){
+  const budgetL=state.teamBudgets[bot.team]*100; const cur=state.currentBid;
+  const squad=state.teamSquads[bot.team]||[]; const sqSz=squad.length;
+  if(budgetL<=cur) return{bid:false};
+  let val=0;
+  if(player.role==='BAT'||player.role==='WK') val=(player.batting.avg/60)*40+(player.batting.sr/200)*30+(player.batting.hs/264)*15;
+  else if(player.role==='BOWL'){const e=parseFloat(player.bowling.eco)||8.5; val=(Math.max(0,12-e)/12)*35+(player.bowling.wkts/300)*40;}
+  else val=(player.batting.avg/60)*20+(player.batting.sr/200)*15+(player.bowling.wkts/300)*25;
+  val=Math.min(100,val+15);
+  const rc={BAT:0,BOWL:0,AR:0,WK:0}; squad.forEach(s=>rc[s.role]=(rc[s.role]||0)+1);
+  let needMult=rc[player.role]===0?2:rc[player.role]===1?1.6:rc[player.role]===2?1.2:rc[player.role]>=4?0.4:1;
+  if(player.role==='WK'&&rc['WK']>=1) needMult=0.3;
+  let pb=1,cte=0.6;
+  if(bot.personality==='aggressive'){pb=1.3;cte=0.82;}
+  else if(bot.personality==='conservative'){pb=0.75;cte=0.38;}
+  else if(bot.personality==='star-chaser'){pb=player.base>=100?1.6:0.7;cte=player.base>=100?0.88:0.3;}
+  const avgBPS=(budgetL/Math.max(1,11-sqSz));
+  const maxW=Math.min(budgetL*.92,avgBPS*pb*(sqSz<3?1.2:sqSz>=8?0.65:1)*needMult,val*needMult*pb*2.5);
+  const finalMax=maxW*(1+bot.stubbornness*.4)*(1+Math.min(0.3,bot.bidStreak*.06));
+  let incr=cur<50?pick([5,10,10,15]):cur<200?pick([10,15,25,25]):cur<500?pick([25,50,50]):pick([50,100,150]);
+  if(bot.personality==='aggressive'&&bot.bidStreak>1) incr=Math.round(incr*1.5);
+  const next=cur+incr;
+  if(next>budgetL||next>finalMax||Math.random()>cte) return{bid:false};
+  return{bid:true,amount:next};
+}
+function botTaunt(bot,dec,player){
+  const lines={
+    aggressive:[`${fmtP(dec.amount)}! Fight me! 💪`,`${player.name} is OURS! ${fmtP(dec.amount)}!`],
+    conservative:[`${fmtP(dec.amount)}. Sensible bid.`,`Careful bid: ${fmtP(dec.amount)}.`],
+    'value-hunter':[`Value spotted! ${fmtP(dec.amount)} 🎯`,`Analytics say YES. ${fmtP(dec.amount)} 📊`],
+    'star-chaser':[`${player.name}!! ${fmtP(dec.amount)} ⭐`,`Must have this star! ${fmtP(dec.amount)}`],
+    balanced:[`${fmtP(dec.amount)} — solid pick.`,`Bidding ${fmtP(dec.amount)}.`],
+  };
+  return pick(lines[bot.personality]||lines.balanced);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TOAST & CONFETTI
+// ═══════════════════════════════════════════════════════════════════
+let toastTimer=null;
+function showToast(name,msg){
+  document.getElementById('bt-toast-name').textContent=name;
+  document.getElementById('bt-toast-msg').textContent=msg;
+  const el=document.getElementById('bid-toast'); el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2500);
+}
+function launchConfetti(){
+  const c=document.getElementById('confetti'); c.innerHTML='';
+  const cols=['#f5c842','#00d4ff','#ff4757','#00e676','#a855f7','#ff6b35'];
+  if(!document.getElementById('cf-style')){
+    const s=document.createElement('style'); s.id='cf-style';
+    s.textContent=`@keyframes cf{to{top:110%;transform:rotate(720deg) translateX(var(--dx));opacity:0}}`;
+    document.head.appendChild(s);
+  }
+  for(let i=0;i<50;i++){
+    const el=document.createElement('div'); const sz=rnd(6,12);
+    el.style.cssText=`position:absolute;width:${sz}px;height:${sz*.6}px;background:${pick(cols)};left:${rnd(10,90)}%;top:-10px;border-radius:2px;--dx:${rnd(-80,80)}px;animation:cf ${rnd(15,30)/10}s linear ${rnd(0,15)/10}s forwards;transform:rotate(${rnd(0,360)}deg)`;
+    c.appendChild(el);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VOICE CHAT
+// ═══════════════════════════════════════════════════════════════════
+const voice={
+  peer:null, peerId:null, myStream:null, connections:{}, participants:{},
+  micEnabled:false, hasPermission:false, audioCtx:null, analyserNode:null,
+  volTimer:null, adminMutedPeers:new Set(),
+};
+function voicePeerId(uid){return 'iplauc'+uid.replace(/-/g,'').slice(0,12);}
+
+function joinVoice(){
+  const m=document.getElementById('mic-modal'); if(m) m.style.display='flex';
+  const s=document.getElementById('mic-status'); if(s) s.textContent='';
+  const b=document.getElementById('mic-allow-btn'); if(b){b.textContent='🎙️ ALLOW MIC';b.disabled=false;}
+  const ic=document.getElementById('mic-icon'); if(ic) ic.textContent='🎙️';
+}
+function closeMicModal(){const m=document.getElementById('mic-modal');if(m)m.style.display='none';}
+
+async function confirmMicPermission(){
+  const btn=document.getElementById('mic-allow-btn');
+  const status=document.getElementById('mic-status');
+  const icon=document.getElementById('mic-icon');
+  btn.disabled=true; btn.textContent='Requesting…';
+  status.textContent='⏳ Waiting for browser permission…'; status.style.color='#f5c842';
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    stream.getAudioTracks().forEach(t=>{t.enabled=true;});
+    voice.myStream=stream; voice.hasPermission=true; voice.micEnabled=true;
+    voice.audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(voice.audioCtx.state==='suspended') await voice.audioCtx.resume();
+    const src=voice.audioCtx.createMediaStreamSource(stream);
+    const analyser=voice.audioCtx.createAnalyser(); analyser.fftSize=512;
+    src.connect(analyser); voice.analyserNode=analyser;
+    startVolPoll();
+    voice.peerId=voicePeerId(state.myId);
+    voice.participants[voice.peerId]={name:state.myName,team:state.myTeam,muted:false,speaking:false};
+    updateMicBtn(true); renderVoiceUsers();
+    icon.textContent='✅'; status.textContent='✅ Mic ON!'; status.style.color='#00e676';
+    setTimeout(()=>{closeMicModal(); connectPeerJS();},600);
+  }catch(err){
+    icon.textContent='❌'; btn.disabled=false; btn.textContent='🎙️ TRY AGAIN';
+    if(err.name==='NotAllowedError') status.innerHTML='❌ Blocked. Click 🔒 in address bar → Microphone → Allow.';
+    else if(err.name==='NotFoundError') status.innerHTML='❌ No mic found.';
+    else status.textContent='❌ '+err.message;
+    status.style.color='#ff4757';
+  }
+}
+
+function startVolPoll(){
+  if(voice.volTimer) clearInterval(voice.volTimer);
+  const buf=new Uint8Array(voice.analyserNode.frequencyBinCount);
+  voice.volTimer=setInterval(()=>{
+    if(!voice.analyserNode||!voice.micEnabled) return;
+    voice.analyserNode.getByteFrequencyData(buf);
+    const avg=buf.reduce((a,b)=>a+b,0)/buf.length;
+    const pct=Math.min(100,avg*2.5);
+    ['wr-vol-fill','auc-vol-fill'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.width=pct+'%';});
+    const pid=voice.peerId;
+    if(pid&&voice.participants[pid]){
+      const spk=avg>10&&voice.micEnabled;
+      if(voice.participants[pid].speaking!==spk){voice.participants[pid].speaking=spk; renderVoiceUsers();}
+    }
+  },60);
+}
+
+function toggleMic(){
+  if(!voice.myStream||!voice.hasPermission){joinVoice();return;}
+  voice.micEnabled=!voice.micEnabled;
+  voice.myStream.getAudioTracks().forEach(t=>{t.enabled=voice.micEnabled;});
+  if(voice.peerId&&voice.participants[voice.peerId]){voice.participants[voice.peerId].muted=!voice.micEnabled; voice.participants[voice.peerId].speaking=false;}
+  updateMicBtn(voice.micEnabled); renderVoiceUsers();
+  relay('VOICE_MIC',{muted:!voice.micEnabled, peerId:voice.peerId});
+  showHT(voice.micEnabled?'🎙️ Mic ON':'🔇 Mic muted');
+}
+
+function updateMicBtn(on){
+  ['wr-mic-btn','auc-mic-btn'].forEach(id=>{
+    const b=document.getElementById(id); if(!b) return;
+    b.classList.remove('live','muted'); b.classList.add(on?'live':'muted');
+    b.textContent=on?'🎙️':'🔇';
+  });
+}
+
+function connectPeerJS(){
+  if(typeof Peer==='undefined'||voice.peer) return;
+  const pid=voice.peerId;
+  let peer; try{peer=new Peer(pid,{debug:0});}catch(e){return;}
+  voice.peer=peer;
+  peer.on('open',id=>{relay('VOICE_JOIN',{peerId:id, name:state.myName, team:state.myTeam});});
+  peer.on('call',call=>{
+    call.answer(voice.myStream);
+    call.on('stream',s=>playRemote(call.peer,s));
+    call.on('close',()=>removeVP(call.peer));
+  });
+  peer.on('error',e=>{
+    if(e.type==='unavailable-id'){peer.destroy();voice.peer=null;voice.peerId=pid+(Math.random().toString(36)[2]);connectPeerJS();}
+  });
+  peer.on('disconnected',()=>{try{peer.reconnect();}catch(e){}});
+}
+
+function callPeer(remotePeerId){
+  if(!voice.peer||!voice.myStream||voice.connections[remotePeerId]) return;
+  const call=voice.peer.call(remotePeerId,voice.myStream); if(!call) return;
+  voice.connections[remotePeerId]=call;
+  call.on('stream',s=>playRemote(remotePeerId,s));
+  call.on('close',()=>removeVP(remotePeerId));
+}
+
+function playRemote(peerId,stream){
+  let el=document.getElementById('aud-'+peerId);
+  if(!el){el=document.createElement('audio');el.id='aud-'+peerId;el.autoplay=true;el.style.display='none';document.body.appendChild(el);}
+  el.srcObject=stream; renderVoiceUsers();
+}
+
+function removeVP(peerId){
+  delete voice.connections[peerId]; delete voice.participants[peerId];
+  const el=document.getElementById('aud-'+peerId); if(el) el.remove();
+  renderVoiceUsers();
+}
+
+function renderVoiceUsers(){
+  ['wr-voice-users','auc-voice-users'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    const entries=Object.entries(voice.participants);
+    if(!entries.length){el.innerHTML='<span style="color:var(--muted);font-size:.68rem">No voice participants</span>';return;}
+    el.innerHTML=entries.map(([pid,p])=>{
+      const isMe=pid===voice.peerId; const t=TEAMS.find(x=>x.id===p.team)||{flag:'🎤'};
+      return `<div class="voice-user${isMe?' me':''}${p.speaking?' speaking':''}">
+        <div class="vu-dot"></div>
+        <span style="max-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.flag} ${p.name}</span>
+        <span>${p.muted?'🔇':'🎙️'}</span>
+      </div>`;
+    }).join('');
+  });
+  const s=document.getElementById('wr-voice-status');
+  if(s){const n=Object.keys(voice.participants).length; s.textContent=n?n+' in voice':'Not connected'; s.style.color=n?'var(--green)':'var(--muted)';}
+}
+
+function handleVoiceMsg(msg){
+  switch(msg.type){
+    case 'VOICE_JOIN':
+      if(!voice.participants[msg.peerId]) voice.participants[msg.peerId]={name:msg.fromName||msg.name,team:msg.fromTeam||msg.team,muted:false,speaking:false};
+      if(voice.peer&&voice.myStream) setTimeout(()=>callPeer(msg.peerId),600);
+      renderVoiceUsers(); break;
+    case 'VOICE_LEAVE': removeVP(msg.peerId); break;
+    case 'VOICE_MIC': if(voice.participants[msg.peerId]) voice.participants[msg.peerId].muted=msg.muted; renderVoiceUsers(); break;
+  }
+}
+
+let _htTimer=null;
+function showHT(msg){const el=document.getElementById('hand-toast');if(!el)return;el.textContent=msg;el.classList.add('show');clearTimeout(_htTimer);_htTimer=setTimeout(()=>el.classList.remove('show'),2800);}
+function leaveVoice(){
+  if(voice.peer){Object.values(voice.connections).forEach(c=>{try{c.close();}catch(e){}});try{voice.peer.destroy();}catch(e){}voice.peer=null;}
+  if(voice.myStream) voice.myStream.getTracks().forEach(t=>t.stop());
+  if(voice.volTimer) clearInterval(voice.volTimer);
+  voice.myStream=null; voice.micEnabled=false; voice.hasPermission=false; voice.participants={}; voice.connections={};
+  updateMicBtn(false);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+</script>
+</body>
+</html>
