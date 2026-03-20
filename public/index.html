@@ -381,6 +381,13 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
      <span class="role-tag rt-AR" style="cursor:pointer;padding:3px 7px" onclick="toggleFilter('AR')">AR</span>
      <span class="role-tag rt-WK" style="cursor:pointer;padding:3px 7px" onclick="toggleFilter('WK')">WK</span>
     </div>
+    <div style="display:flex;gap:3px;margin-top:3px;flex-wrap:wrap" id="set-filter-btns">
+     <span style="cursor:pointer;padding:2px 6px;border-radius:3px;font-size:.58rem;font-weight:700;background:rgba(245,200,66,.15);color:var(--gold);border:1px solid rgba(245,200,66,.3)" onclick="toggleSetFilter('marquee')">⭐</span>
+     <span style="cursor:pointer;padding:2px 6px;border-radius:3px;font-size:.58rem;font-weight:700;background:rgba(0,212,255,.15);color:var(--accent);border:1px solid rgba(0,212,255,.3)" onclick="toggleSetFilter('capped_india')">🇮🇳</span>
+     <span style="cursor:pointer;padding:2px 6px;border-radius:3px;font-size:.58rem;font-weight:700;background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3)" onclick="toggleSetFilter('capped_overseas')">🌍</span>
+     <span style="cursor:pointer;padding:2px 6px;border-radius:3px;font-size:.58rem;font-weight:700;background:rgba(168,85,247,.15);color:#a855f7;border:1px solid rgba(168,85,247,.3)" onclick="toggleSetFilter('uncapped')">🌟</span>
+     <span style="cursor:pointer;padding:2px 6px;border-radius:3px;font-size:.58rem;font-weight:700;background:rgba(255,107,53,.15);color:var(--orange);border:1px solid rgba(255,107,53,.3)" onclick="toggleSetFilter('accelerated')">⚡</span>
+    </div>
    </div>
    <div class="player-pool" id="player-pool"></div>
   </div>
@@ -426,6 +433,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
    </div>
    <div class="bid-controls" id="bid-controls">
     <div class="my-budget"><div class="my-budget-val" id="my-budget-val">₹120Cr</div><div class="my-budget-lbl">BUDGET</div></div>
+   <div class="my-budget" id="overseas-counter"><div class="my-budget-val" id="overseas-val" style="color:var(--accent)">0/8</div><div class="my-budget-lbl">OVERSEAS</div></div>
     <div class="bid-inc-btns">
      <button class="bid-inc" onclick="adjustBid(5)">+5L</button>
      <button class="bid-inc" onclick="adjustBid(10)">+10L</button>
@@ -490,6 +498,16 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
 <div class="unsold-anim" id="unsold-anim">
  <div class="ua-x">❌</div><div class="ua-text">UNSOLD</div><div class="ua-name" id="ua-name"></div>
 </div>
+<!-- SET INTRO OVERLAY -->
+<div id="set-intro" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.96);backdrop-filter:blur(20px);align-items:center;justify-content:center;flex-direction:column;text-align:center;">
+  <div id="si-set-icon" style="font-size:5rem;margin-bottom:1rem;filter:drop-shadow(0 0 40px currentColor)">⭐</div>
+  <div style="font-size:.7rem;letter-spacing:5px;color:var(--muted);text-transform:uppercase;margin-bottom:.75rem">NOW BEGINNING</div>
+  <div id="si-set-name" style="font-family:'Bebas Neue';font-size:4.5rem;letter-spacing:4px;line-height:1;margin-bottom:.5rem">MARQUEE SET</div>
+  <div id="si-set-desc" style="color:var(--muted);font-size:.95rem;max-width:400px;line-height:1.6;margin-bottom:2rem"></div>
+  <div id="si-player-count" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:.5rem 1.5rem;font-family:'Bebas Neue';font-size:1.4rem;letter-spacing:2px;margin-bottom:2rem"></div>
+  <div id="si-countdown" style="font-family:'Bebas Neue';font-size:3rem;color:var(--gold);letter-spacing:4px">3</div>
+</div>
+
 <div class="bid-toast" id="bid-toast"><div class="bt-name" id="bt-toast-name"></div><div class="bt-msg" id="bt-toast-msg"></div></div>
 <div class="hand-toast" id="hand-toast"></div>
 
@@ -507,7 +525,6 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
  </div>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // DATA
@@ -529,227 +546,248 @@ const AV=['🧔','👨','👱','🧑','👴','🎩','🧢','👲'];
 function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
 function pick(a){return a[rnd(0,a.length-1)];}
 
-// [name, role, nat, base, batAvg, batSR, batHS, wikiImg]
-// wikiImg = Wikipedia commons filename for thumbnail API
+// ═══════════════════════════════════════════════════════════════════
+// AUCTION SETS — Real IPL structure
+// Sets: MARQUEE, CAPPED_INDIA, CAPPED_OVERSEAS, UNCAPPED, ACCELERATED
+// [name, role, nat, base, batAvg, batSR, batHS, wikiFile, set, caps]
+// set: 'marquee'|'capped_india'|'capped_overseas'|'uncapped'|'accelerated'
+// caps: number of international matches (rough)
+// ═══════════════════════════════════════════════════════════════════
+const AUCTION_SETS = [
+  { id:'marquee',      label:'⭐ Marquee Players',     color:'#f5c842', desc:'Elite global stars — highest base prices' },
+  { id:'capped_india', label:'🇮🇳 Capped Indian Players', color:'#00d4ff', desc:'India-capped players' },
+  { id:'capped_overseas', label:'🌍 Capped Overseas Players', color:'#00e676', desc:'Internationally capped overseas stars' },
+  { id:'uncapped',     label:'🌟 Uncapped Players',    color:'#a855f7', desc:'Uncapped players — hidden gems' },
+  { id:'accelerated',  label:'⚡ Accelerated Set',     color:'#ff6b35', desc:'Fast-tracked young talent' },
+];
+
 const RAW_PLAYERS=[
-  // ── INDIA BATSMEN ──
-  ['Virat Kohli','BAT','IN',200,59.1,138,254,'Virat_Kohli_portrait.jpg'],
-  ['Rohit Sharma','BAT','IN',200,56.4,140,264,'Rohit_Sharma_-_2019.jpg'],
-  ['Shubman Gill','BAT','IN',200,54.2,142,149,'Shubman_Gill_(cropped).jpg'],
-  ['Yashasvi Jaiswal','BAT','IN',200,54.8,163,209,'Yashasvi_Jaiswal.jpg'],
-  ['Suryakumar Yadav','BAT','IN',200,47.5,187,117,'Suryakumar_Yadav.jpg'],
-  ['Shreyas Iyer','BAT','IN',200,43.2,128,96,'Shreyas_Iyer.jpg'],
-  ['Tilak Varma','BAT','IN',150,48.2,145,120,''],
-  ['Rinku Singh','BAT','IN',150,52.1,156,67,''],
-  ['Ruturaj Gaikwad','BAT','IN',150,45.6,140,108,'Ruturaj_Gaikwad.jpg'],
-  ['Prithvi Shaw','BAT','IN',75,35.6,154,99,'Prithvi_Shaw.jpg'],
-  ['Devdutt Padikkal','BAT','IN',75,38.4,138,101,''],
-  ['Rajat Patidar','BAT','IN',75,40.2,162,112,''],
-  ['Shikhar Dhawan','BAT','IN',75,42.2,128,97,'Shikhar_Dhawan.jpg'],
-  ['Vaibhav Suryavanshi','BAT','IN',150,42.6,170,105,''],
-  ['Shahrukh Khan','BAT','IN',40,28.4,166,78,''],
-  ['Nehal Wadhera','BAT','IN',20,30.4,148,82,''],
-  ['Shashank Singh','BAT','IN',20,28.4,152,68,''],
-  ['Ashutosh Sharma','BAT','IN',20,32.4,156,72,''],
-  // ── INDIA WK ──
-  ['KL Rahul','WK','IN',200,47.3,136,132,'KL_Rahul.jpg'],
-  ['Rishabh Pant','WK','IN',200,38.6,152,128,'Rishabh_Pant.jpg'],
-  ['MS Dhoni','WK','IN',200,38.4,136,84,'MS_Dhoni.jpg'],
-  ['Sanju Samson','WK','IN',150,40.2,148,119,'Sanju_Samson.jpg'],
-  ['Ishan Kishan','WK','IN',150,35.8,132,99,'Ishan_Kishan.jpg'],
-  ['Dhruv Jurel','WK','IN',40,34.2,128,77,''],
-  ['Jitesh Sharma','WK','IN',40,34.8,164,49,''],
-  ['Prabhsimran Singh','WK','IN',40,32.4,148,91,''],
-  ['Dinesh Karthik','WK','IN',50,26.4,183,92,'Dinesh_Karthik.jpg'],
-  // ── INDIA AR ──
-  ['Hardik Pandya','AR','IN',200,32.4,152,91,'Hardik_Pandya.jpg'],
-  ['Ravindra Jadeja','AR','IN',200,34.2,132,112,'Ravindra_Jadeja.jpg'],
-  ['Axar Patel','AR','IN',100,26.8,144,93,'Axar_Patel.jpg'],
-  ['Washington Sundar','AR','IN',75,24.4,138,86,'Washington_Sundar.jpg'],
-  ['Shardul Thakur','AR','IN',100,22.4,142,67,'Shardul_Thakur.jpg'],
-  ['Venkatesh Iyer','AR','IN',100,36.4,152,104,''],
-  ['Abhishek Sharma','AR','IN',150,44.2,186,135,''],
-  ['Nitish Kumar Reddy','AR','IN',100,38.6,148,74,''],
-  ['Shivam Dube','AR','IN',75,42.8,152,95,''],
-  ['Riyan Parag','AR','IN',75,34.8,158,84,''],
-  ['Deepak Hooda','AR','IN',75,32.6,144,104,''],
-  ['Krunal Pandya','AR','IN',75,26.4,138,86,'Krunal_Pandya.jpg'],
-  ['Shahbaz Ahmed','AR','IN',40,22.4,138,78,''],
-  ['Deepak Chahar','AR','IN',100,20.2,128,69,'Deepak_Chahar.jpg'],
-  ['Nitish Rana','AR','IN',40,26.4,142,87,''],
-  ['Rahul Tewatia','AR','IN',75,28.4,158,92,''],
-  ['Gurnoor Brar','AR','IN',20,20.4,138,52,''],
-  ['Ramandeep Singh','AR','IN',20,22.4,148,56,''],
-  // ── INDIA BOWL ──
-  ['Jasprit Bumrah','BOWL','IN',200,0,0,0,'Jasprit_Bumrah.jpg'],
-  ['Mohammed Shami','BOWL','IN',200,0,0,0,'Mohammed_Shami.jpg'],
-  ['Kuldeep Yadav','BOWL','IN',200,0,0,0,'Kuldeep_Yadav.jpg'],
-  ['Arshdeep Singh','BOWL','IN',200,0,0,0,'Arshdeep_Singh.jpg'],
-  ['Yuzvendra Chahal','BOWL','IN',100,0,0,0,'Yuzvendra_Chahal.jpg'],
-  ['Mohammed Siraj','BOWL','IN',100,0,0,0,'Mohammed_Siraj.jpg'],
-  ['Ravichandran Ashwin','BOWL','IN',100,0,0,0,'Ravichandran_Ashwin.jpg'],
-  ['Bhuvneshwar Kumar','BOWL','IN',75,0,0,0,'Bhuvneshwar_Kumar.jpg'],
-  ['Harshal Patel','BOWL','IN',75,0,0,0,''],
-  ['Prasidh Krishna','BOWL','IN',75,0,0,0,''],
-  ['Ravi Bishnoi','BOWL','IN',75,0,0,0,''],
-  ['Varun Chakaravarthy','BOWL','IN',75,0,0,0,''],
-  ['T Natarajan','BOWL','IN',75,0,0,0,'T._Natarajan.jpg'],
-  ['Harshit Rana','BOWL','IN',75,0,0,0,''],
-  ['Avesh Khan','BOWL','IN',75,0,0,0,'Avesh_Khan.jpg'],
-  ['Akash Deep','BOWL','IN',40,0,0,0,''],
-  ['Khaleel Ahmed','BOWL','IN',40,0,0,0,''],
-  ['Umesh Yadav','BOWL','IN',40,0,0,0,'Umesh_Yadav.jpg'],
-  ['Mukesh Kumar','BOWL','IN',40,0,0,0,''],
-  ['Yash Dayal','BOWL','IN',40,0,0,0,''],
-  ['Jaydev Unadkat','BOWL','IN',40,0,0,0,''],
-  ['Siddharth Kaul','BOWL','IN',20,0,0,0,''],
-  ['Karn Sharma','BOWL','IN',20,0,0,0,''],
-  ['Sandeep Sharma','BOWL','IN',20,0,0,0,''],
-  ['Kamlesh Nagarkoti','BOWL','IN',20,0,0,0,''],
-  ['Yash Thakur','BOWL','IN',20,0,0,0,''],
-  ['Simarjeet Singh','BOWL','IN',20,0,0,0,''],
-  // ── AUSTRALIA ──
-  ['Travis Head','BAT','AU',200,50.8,156,163,'Travis_Head.jpg'],
-  ['David Warner','BAT','AU',150,44.6,140,153,'David_Warner.jpg'],
-  ['Steve Smith','BAT','AU',75,42.2,128,103,'Steve_Smith.jpg'],
-  ['Jake Fraser-McGurk','BAT','AU',100,42.4,188,116,''],
-  ['Josh Inglis','WK','AU',75,36.8,152,86,''],
-  ['Matthew Wade','WK','AU',50,30.2,152,99,'Matthew_Wade.jpg'],
-  ['Glenn Maxwell','AR','AU',200,34.6,162,154,'Glenn_Maxwell.jpg'],
-  ['Marcus Stoinis','AR','AU',150,38.2,152,140,'Marcus_Stoinis.jpg'],
-  ['Mitchell Marsh','AR','AU',150,42.4,154,102,'Mitchell_Marsh.jpg'],
-  ['Pat Cummins','AR','AU',200,26.8,142,66,'Pat_Cummins.jpg'],
-  ['Cameron Green','AR','AU',200,36.4,158,121,'Cameron_Green.jpg'],
-  ['Matthew Short','AR','AU',75,36.4,152,93,''],
-  ['Mitchell Starc','BOWL','AU',200,0,0,0,'Mitchell_Starc.jpg'],
-  ['Josh Hazlewood','BOWL','AU',150,0,0,0,'Josh_Hazlewood.jpg'],
-  ['Adam Zampa','BOWL','AU',100,0,0,0,'Adam_Zampa.jpg'],
-  ['Nathan Ellis','BOWL','AU',75,0,0,0,''],
-  ['Spencer Johnson','BOWL','AU',75,0,0,0,''],
-  // ── ENGLAND ──
-  ['Jos Buttler','WK','ENG',200,38.6,148,124,'Jos_Buttler.jpg'],
-  ['Phil Salt','WK','ENG',200,36.4,168,119,'Phil_Salt.jpg'],
-  ['Jonny Bairstow','WK','ENG',100,36.8,146,114,'Jonny_Bairstow.jpg'],
-  ['Sam Billings','WK','ENG',20,28.2,132,95,''],
-  ['Harry Brook','BAT','ENG',200,52.4,158,186,'Harry_Brook.jpg'],
-  ['Jason Roy','BAT','ENG',75,32.4,152,122,'Jason_Roy.jpg'],
-  ['Ben Stokes','AR','ENG',200,36.4,142,182,'Ben_Stokes.jpg'],
-  ['Sam Curran','AR','ENG',200,26.8,138,95,'Sam_Curran.jpg'],
-  ['Liam Livingstone','AR','ENG',200,36.4,166,103,'Liam_Livingstone.jpg'],
-  ['Will Jacks','AR','ENG',75,34.8,158,100,''],
-  ['Moeen Ali','AR','ENG',75,28.4,142,72,'Moeen_Ali.jpg'],
-  ['Mark Wood','BOWL','ENG',150,0,0,0,'Mark_Wood.jpg'],
-  ['Jofra Archer','BOWL','ENG',200,0,0,0,'Jofra_Archer.jpg'],
-  ['Adil Rashid','BOWL','ENG',75,0,0,0,'Adil_Rashid.jpg'],
-  ['Chris Jordan','BOWL','ENG',40,0,0,0,''],
-  ['Reece Topley','BOWL','ENG',40,0,0,0,''],
-  ['Tom Curran','BOWL','ENG',40,0,0,0,''],
-  // ── WEST INDIES ──
-  ['Nicholas Pooran','WK','WI',200,36.4,180,104,'Nicholas_Pooran.jpg'],
-  ['Shimron Hetmyer','BAT','WI',150,40.2,162,139,'Shimron_Hetmyer.jpg'],
-  ['Rovman Powell','BAT','WI',100,32.8,182,85,''],
-  ['Evin Lewis','BAT','WI',40,30.4,162,94,''],
-  ['Andre Russell','AR','WI',200,28.4,188,121,'Andre_Russell.jpg'],
-  ['Sunil Narine','AR','WI',100,22.4,174,109,'Sunil_Narine.jpg'],
-  ['Kyle Mayers','AR','WI',75,38.2,148,210,''],
-  ['Jason Holder','AR','WI',100,26.4,132,92,'Jason_Holder.jpg'],
-  ['Kieron Pollard','AR','WI',75,28.4,158,104,'Kieron_Pollard.jpg'],
-  ['Romario Shepherd','AR','WI',40,24.4,168,62,''],
-  ['Fabian Allen','AR','WI',40,24.4,148,68,''],
-  ['Alzarri Joseph','BOWL','WI',100,0,0,0,'Alzarri_Joseph.jpg'],
-  ['Akeal Hosein','BOWL','WI',40,0,0,0,''],
-  ['Obed McCoy','BOWL','WI',40,0,0,0,''],
-  ['Gudakesh Motie','BOWL','WI',40,0,0,0,''],
-  // ── SOUTH AFRICA ──
-  ['Quinton de Kock','WK','SA',150,44.2,136,135,'Quinton_de_Kock.jpg'],
-  ['Heinrich Klaasen','WK','SA',200,49.8,180,174,''],
-  ['Ryan Rickelton','WK','SA',100,42.4,148,129,''],
-  ['David Miller','BAT','SA',150,40.8,156,116,'David_Miller.jpg'],
-  ['Faf du Plessis','BAT','SA',100,36.4,136,96,'Faf_du_Plessis.jpg'],
-  ['Aiden Markram','BAT','SA',150,40.2,148,152,'Aiden_Markram.jpg'],
-  ['Rilee Rossouw','BAT','SA',75,38.6,162,102,''],
-  ['Rassie van der Dussen','BAT','SA',75,52.4,128,119,''],
-  ['Dewald Brevis','BAT','SA',100,42.4,172,108,''],
-  ['Kagiso Rabada','BOWL','SA',200,0,0,0,'Kagiso_Rabada.jpg'],
-  ['Anrich Nortje','BOWL','SA',200,0,0,0,'Anrich_Nortje.jpg'],
-  ['Lungi Ngidi','BOWL','SA',75,0,0,0,''],
-  ['Gerald Coetzee','BOWL','SA',100,0,0,0,''],
-  ['Tabraiz Shamsi','BOWL','SA',75,0,0,0,''],
-  ['Imran Tahir','BOWL','SA',40,0,0,0,'Imran_Tahir.jpg'],
-  ['Marco Jansen','AR','SA',150,24.4,148,48,''],
-  ['Wayne Parnell','AR','SA',40,20.4,138,62,''],
-  ['Dwaine Pretorius','AR','SA',40,20.4,148,62,''],
-  // ── AFGHANISTAN ──
-  ['Rahmanullah Gurbaz','WK','AFG',150,42.4,168,121,'Rahmanullah_Gurbaz.jpg'],
-  ['Ibrahim Zadran','BAT','AFG',75,42.8,134,162,''],
-  ['Hazratullah Zazai','BAT','AFG',40,28.4,172,162,''],
-  ['Rashid Khan','BOWL','AFG',200,0,0,0,'Rashid_Khan.jpg'],
-  ['Mujeeb ur Rahman','BOWL','AFG',100,0,0,0,'Mujeeb_ur_Rahman.jpg'],
-  ['Fazalhaq Farooqi','BOWL','AFG',150,0,0,0,''],
-  ['Noor Ahmad','BOWL','AFG',150,0,0,0,''],
-  ['Naveen ul Haq','BOWL','AFG',75,0,0,0,''],
-  ['Waqar Salamkheil','BOWL','AFG',40,0,0,0,''],
-  ['Mohammad Nabi','AR','AFG',75,24.4,142,119,'Mohammad_Nabi.jpg'],
-  ['Azmatullah Omarzai','AR','AFG',75,28.4,148,97,''],
-  ['Gulbadin Naib','AR','AFG',20,22.4,138,61,''],
-  // ── PAKISTAN ──
-  ['Babar Azam','BAT','PAK',200,52.8,130,122,'Babar_Azam.jpg'],
-  ['Mohammad Rizwan','WK','PAK',150,50.4,128,104,'Mohammad_Rizwan.jpg'],
-  ['Sarfaraz Ahmed','WK','PAK',40,36.4,128,90,'Sarfaraz_Ahmed.jpg'],
-  ['Fakhar Zaman','BAT','PAK',75,42.6,146,193,'Fakhar_Zaman.jpg'],
-  ['Saim Ayub','BAT','PAK',100,46.2,152,113,''],
-  ['Shaheen Shah Afridi','BOWL','PAK',200,0,0,0,'Shaheen_Shah_Afridi.jpg'],
-  ['Naseem Shah','BOWL','PAK',150,0,0,0,''],
-  ['Hasan Ali','BOWL','PAK',40,0,0,0,'Hasan_Ali.jpg'],
-  ['Shadab Khan','AR','PAK',100,20.4,158,86,'Shadab_Khan.jpg'],
-  ['Iftikhar Ahmed','AR','PAK',40,28.4,148,93,''],
-  ['Khushdil Shah','AR','PAK',40,24.4,152,74,''],
-  // ── SRI LANKA ──
-  ['Kusal Mendis','WK','SL',75,36.4,128,166,'Kusal_Mendis.jpg'],
-  ['Bhanuka Rajapaksa','WK','SL',50,36.4,148,96,''],
-  ['Pathum Nissanka','BAT','SL',50,40.2,128,178,''],
-  ['Charith Asalanka','BAT','SL',50,36.4,132,97,''],
-  ['Tim David','BAT','SL',200,50.4,180,96,'Tim_David.jpg'],
-  ['Wanindu Hasaranga','AR','SL',200,24.4,158,66,'Wanindu_Hasaranga.jpg'],
-  ['Angelo Mathews','AR','SL',40,34.4,122,160,'Angelo_Mathews.jpg'],
-  ['Matheesha Pathirana','BOWL','SL',200,0,0,0,''],
-  ['Dushmantha Chameera','BOWL','SL',75,0,0,0,''],
-  ['Maheesh Theekshana','BOWL','SL',75,0,0,0,''],
-  ['Lahiru Kumara','BOWL','SL',40,0,0,0,''],
-  // ── NEW ZEALAND ──
-  ['Kane Williamson','BAT','NZ',75,48.2,128,148,'Kane_Williamson.jpg'],
-  ['Devon Conway','WK','NZ',75,48.4,132,99,'Devon_Conway.jpg'],
-  ['Finn Allen','WK','NZ',100,36.4,168,96,''],
-  ['Daryl Mitchell','AR','NZ',75,40.8,148,190,''],
-  ['Rachin Ravindra','AR','NZ',150,46.4,152,240,'Rachin_Ravindra.jpg'],
-  ['Glenn Phillips','AR','NZ',75,38.4,158,108,''],
-  ['Mitchell Santner','AR','NZ',75,22.4,132,67,''],
-  ['Kyle Jamieson','AR','NZ',100,24.4,138,74,'Kyle_Jamieson.jpg'],
-  ['Lockie Ferguson','BOWL','NZ',150,0,0,0,'Lockie_Ferguson.jpg'],
-  ['Trent Boult','BOWL','NZ',100,0,0,0,'Trent_Boult.jpg'],
-  ['Tim Southee','BOWL','NZ',50,0,0,0,'Tim_Southee.jpg'],
-  ['Matt Henry','BOWL','NZ',75,0,0,0,''],
-  // ── BANGLADESH ──
-  ['Mushfiqur Rahim','WK','BAN',40,36.4,122,144,'Mushfiqur_Rahim.jpg'],
-  ['Liton Das','WK','BAN',40,36.4,132,141,''],
-  ['Mustafizur Rahman','BOWL','BAN',100,0,0,0,'Mustafizur_Rahman.jpg'],
-  ['Taskin Ahmed','BOWL','BAN',75,0,0,0,''],
-  ['Shoriful Islam','BOWL','BAN',40,0,0,0,''],
-  ['Shakib Al Hasan','AR','BAN',75,28.4,132,84,'Shakib_Al_Hasan.jpg'],
-  ['Mahmudullah','AR','BAN',40,28.4,128,76,'Mahmudullah.jpg'],
-  ['Afif Hossain','AR','BAN',40,28.4,138,72,''],
-  ['Mehidy Hasan Miraz','AR','BAN',40,24.4,124,81,''],
-  // ── ZIMBABWE / IRELAND ──
-  ['Sikandar Raza','AR','ZIM',40,28.4,148,121,'Sikandar_Raza.jpg'],
-  ['Blessing Muzarabani','BOWL','ZIM',40,0,0,0,''],
-  ['Sean Williams','AR','ZIM',20,28.4,128,88,''],
-  ['Tenda Mutombodzi','AR','ZIM',20,22.4,148,64,''],
-  ['Paul Stirling','BAT','IRE',20,30.4,142,95,''],
-  ['Lorcan Tucker','WK','IRE',20,26.4,132,88,''],
-  ['George Dockrell','AR','IRE',20,18.4,112,52,''],
-  ['Josh Little','BOWL','IRE',20,0,0,0,''],
-  ['Barry McCarthy','BOWL','IRE',20,0,0,0,''],
-  ['Mark Adair','AR','IRE',20,22.4,128,68,''],
+  // ─── MARQUEE SET ────────────────────────────────────────────────
+  ['Virat Kohli','BAT','IN',200,59.1,138,254,'Virat_Kohli_portrait.jpg','marquee',120],
+  ['Rohit Sharma','BAT','IN',200,56.4,140,264,'Rohit_Sharma_-_2019.jpg','marquee',148],
+  ['Jasprit Bumrah','BOWL','IN',200,0,0,0,'Jasprit_Bumrah.jpg','marquee',85],
+  ['Hardik Pandya','AR','IN',200,32.4,152,91,'Hardik_Pandya_2017.jpg','marquee',106],
+  ['Rashid Khan','BOWL','AFG',200,0,0,0,'Rashid_Khan.jpg','marquee',80],
+  ['Pat Cummins','AR','AU',200,26.8,142,66,'Pat_Cummins.jpg','marquee',110],
+  ['Jos Buttler','WK','ENG',200,38.6,148,124,'Jos_Buttler_(cropped).jpg','marquee',175],
+  ['Mitchell Starc','BOWL','AU',200,0,0,0,'Mitchell_Starc.jpg','marquee',105],
+  ['Ben Stokes','AR','ENG',200,36.4,142,182,'Ben_Stokes.jpg','marquee',115],
+  ['Andre Russell','AR','WI',200,28.4,188,121,'Andre_Russell.jpg','marquee',80],
+  ['Suryakumar Yadav','BAT','IN',200,47.5,187,117,'Suryakumar_Yadav_at_the_2022_T20_World_Cup_(cropped).jpg','marquee',65],
+  ['Kagiso Rabada','BOWL','SA',200,0,0,0,'Kagiso_Rabada.jpg','marquee',90],
+  ['Trent Boult','BOWL','NZ',100,0,0,0,'Trent_Boult.jpg','marquee',86],
+  ['Travis Head','BAT','AU',200,50.8,156,163,'Travis_Head.jpg','marquee',55],
+  ['Rishabh Pant','WK','IN',200,38.6,152,128,'Rishabh_Pant_2018.jpg','marquee',66],
+  ['KL Rahul','WK','IN',200,47.3,136,132,'KL_Rahul_(cropped).jpg','marquee',72],
+  ['Ravindra Jadeja','AR','IN',200,34.2,132,112,'Ravindra_Jadeja.jpg','marquee',72],
+
+  // ─── CAPPED INDIAN PLAYERS ──────────────────────────────────────
+  ['Shubman Gill','BAT','IN',200,54.2,142,149,'Shubman_Gill_(cropped).jpg','capped_india',48],
+  ['Yashasvi Jaiswal','BAT','IN',200,54.8,163,209,'Yashasvi_Jaiswal_(cropped).jpg','capped_india',32],
+  ['Shreyas Iyer','BAT','IN',200,43.2,128,96,'Shreyas_Iyer.jpg','capped_india',55],
+  ['Sanju Samson','WK','IN',150,40.2,148,119,'Sanju_Samson.jpg','capped_india',38],
+  ['Ruturaj Gaikwad','BAT','IN',150,45.6,140,108,'Ruturaj_Gaikwad.jpg','capped_india',28],
+  ['Ishan Kishan','WK','IN',150,35.8,132,99,'Ishan_Kishan.jpg','capped_india',32],
+  ['Tilak Varma','BAT','IN',150,48.2,145,120,'','capped_india',18],
+  ['Rinku Singh','BAT','IN',150,52.1,156,67,'','capped_india',22],
+  ['Axar Patel','AR','IN',100,26.8,144,93,'Axar_Patel_(cropped).jpg','capped_india',68],
+  ['Washington Sundar','AR','IN',75,24.4,138,86,'Washington_Sundar.jpg','capped_india',42],
+  ['Shardul Thakur','AR','IN',100,22.4,142,67,'Shardul_Thakur.jpg','capped_india',56],
+  ['Venkatesh Iyer','AR','IN',100,36.4,152,104,'','capped_india',12],
+  ['Abhishek Sharma','AR','IN',150,44.2,186,135,'','capped_india',15],
+  ['Nitish Kumar Reddy','AR','IN',100,38.6,148,74,'','capped_india',10],
+  ['Deepak Chahar','AR','IN',100,20.2,128,69,'Deepak_Chahar.jpg','capped_india',42],
+  ['Mohammed Shami','BOWL','IN',200,0,0,0,'Mohammad_Shami.jpg','capped_india',88],
+  ['Kuldeep Yadav','BOWL','IN',200,0,0,0,'Kuldeep_Yadav.jpg','capped_india',62],
+  ['Arshdeep Singh','BOWL','IN',200,0,0,0,'Arshdeep_Singh.jpg','capped_india',52],
+  ['Yuzvendra Chahal','BOWL','IN',100,0,0,0,'Yuzvendra_Chahal.jpg','capped_india',72],
+  ['Mohammed Siraj','BOWL','IN',100,0,0,0,'Mohammed_Siraj.jpg','capped_india',44],
+  ['Ravichandran Ashwin','BOWL','IN',100,0,0,0,'Ravichandran_Ashwin.jpg','capped_india',92],
+  ['Bhuvneshwar Kumar','BOWL','IN',75,0,0,0,'Bhuvneshwar_Kumar.jpg','capped_india',82],
+  ['Harshal Patel','BOWL','IN',75,0,0,0,'','capped_india',38],
+  ['Prasidh Krishna','BOWL','IN',75,0,0,0,'','capped_india',28],
+  ['T Natarajan','BOWL','IN',75,0,0,0,'T._Natarajan.jpg','capped_india',22],
+  ['Harshit Rana','BOWL','IN',75,0,0,0,'','capped_india',14],
+  ['Avesh Khan','BOWL','IN',75,0,0,0,'Avesh_Khan.jpg','capped_india',24],
+  ['Ravi Bishnoi','BOWL','IN',75,0,0,0,'','capped_india',32],
+  ['Varun Chakaravarthy','BOWL','IN',75,0,0,0,'','capped_india',20],
+  ['MS Dhoni','WK','IN',200,38.4,136,84,'Mahendra_Singh_Dhoni.jpg','capped_india',350],
+  ['Dinesh Karthik','WK','IN',50,26.4,183,92,'Dinesh_Karthik.jpg','capped_india',98],
+  ['Shikhar Dhawan','BAT','IN',75,42.2,128,97,'Shikhar_Dhawan.jpg','capped_india',148],
+  ['Prithvi Shaw','BAT','IN',75,35.6,154,99,'Prithvi_Shaw.jpg','capped_india',12],
+  ['Devdutt Padikkal','BAT','IN',75,38.4,138,101,'','capped_india',8],
+  ['Krunal Pandya','AR','IN',75,26.4,138,86,'Krunal_Pandya.jpg','capped_india',38],
+  ['Deepak Hooda','AR','IN',75,32.6,144,104,'','capped_india',22],
+  ['Riyan Parag','AR','IN',75,34.8,158,84,'','capped_india',14],
+  ['Khaleel Ahmed','BOWL','IN',40,0,0,0,'','capped_india',22],
+  ['Umesh Yadav','BOWL','IN',40,0,0,0,'Umesh_Yadav.jpg','capped_india',64],
+  ['Mukesh Kumar','BOWL','IN',40,0,0,0,'','capped_india',12],
+  ['Akash Deep','BOWL','IN',40,0,0,0,'','capped_india',8],
+  ['Jaydev Unadkat','BOWL','IN',40,0,0,0,'','capped_india',18],
+  ['Rajat Patidar','BAT','IN',75,40.2,162,112,'','capped_india',6],
+  ['Dhruv Jurel','WK','IN',40,34.2,128,77,'','capped_india',8],
+  ['Jitesh Sharma','WK','IN',40,34.8,164,49,'','capped_india',6],
+  ['Shivam Dube','AR','IN',75,42.8,152,95,'','capped_india',22],
+
+  // ─── CAPPED OVERSEAS ────────────────────────────────────────────
+  ['David Warner','BAT','AU',150,44.6,140,153,'David_Warner.jpg','capped_overseas',100],
+  ['Glenn Maxwell','AR','AU',200,34.6,162,154,'Glenn_Maxwell.jpg','capped_overseas',115],
+  ['Marcus Stoinis','AR','AU',150,38.2,152,140,'Marcus_Stoinis.jpg','capped_overseas',66],
+  ['Mitchell Marsh','AR','AU',150,42.4,154,102,'Mitchell_Marsh.jpg','capped_overseas',82],
+  ['Cameron Green','AR','AU',200,36.4,158,121,'Cameron_Green.jpg','capped_overseas',38],
+  ['Josh Hazlewood','BOWL','AU',150,0,0,0,'Josh_Hazlewood.jpg','capped_overseas',88],
+  ['Adam Zampa','BOWL','AU',100,0,0,0,'Adam_Zampa.jpg','capped_overseas',92],
+  ['Steve Smith','BAT','AU',75,42.2,128,103,'Steve_Smith_(cricketer).jpg','capped_overseas',150],
+  ['Jake Fraser-McGurk','BAT','AU',100,42.4,188,116,'','capped_overseas',12],
+  ['Phil Salt','WK','ENG',200,36.4,168,119,'Phil_Salt.jpg','capped_overseas',38],
+  ['Sam Curran','AR','ENG',200,26.8,138,95,'Sam_Curran.jpg','capped_overseas',62],
+  ['Liam Livingstone','AR','ENG',200,36.4,166,103,'Liam_Livingstone.jpg','capped_overseas',68],
+  ['Harry Brook','BAT','ENG',200,52.4,158,186,'Harry_Brook.jpg','capped_overseas',42],
+  ['Mark Wood','BOWL','ENG',150,0,0,0,'Mark_Wood_(cricketer).jpg','capped_overseas',72],
+  ['Jofra Archer','BOWL','ENG',200,0,0,0,'Jofra_Archer.jpg','capped_overseas',42],
+  ['Jonny Bairstow','WK','ENG',100,36.8,146,114,'Jonny_Bairstow.jpg','capped_overseas',88],
+  ['Moeen Ali','AR','ENG',75,28.4,142,72,'Moeen_Ali.jpg','capped_overseas',98],
+  ['Sunil Narine','AR','WI',100,22.4,174,109,'Sunil_Narine.jpg','capped_overseas',62],
+  ['Shimron Hetmyer','BAT','WI',150,40.2,162,139,'Shimron_Hetmyer.jpg','capped_overseas',72],
+  ['Nicholas Pooran','WK','WI',200,36.4,180,104,'Nicholas_Pooran.jpg','capped_overseas',88],
+  ['Rovman Powell','BAT','WI',100,32.8,182,85,'','capped_overseas',55],
+  ['Jason Holder','AR','WI',100,26.4,132,92,'Jason_Holder.jpg','capped_overseas',85],
+  ['Alzarri Joseph','BOWL','WI',100,0,0,0,'Alzarri_Joseph.jpg','capped_overseas',42],
+  ['Kieron Pollard','AR','WI',75,28.4,158,104,'Kieron_Pollard.jpg','capped_overseas',125],
+  ['Kyle Mayers','AR','WI',75,38.2,148,210,'','capped_overseas',38],
+  ['Anrich Nortje','BOWL','SA',200,0,0,0,'Anrich_Nortje.jpg','capped_overseas',52],
+  ['Quinton de Kock','WK','SA',150,44.2,136,135,'Quinton_de_Kock.jpg','capped_overseas',110],
+  ['Heinrich Klaasen','WK','SA',200,49.8,180,174,'','capped_overseas',42],
+  ['David Miller','BAT','SA',150,40.8,156,116,'David_Miller_(South_African_cricketer).jpg','capped_overseas',98],
+  ['Marco Jansen','AR','SA',150,24.4,148,48,'','capped_overseas',28],
+  ['Aiden Markram','BAT','SA',150,40.2,148,152,'Aiden_Markram.jpg','capped_overseas',68],
+  ['Faf du Plessis','BAT','SA',100,36.4,136,96,'Faf_du_Plessis.jpg','capped_overseas',120],
+  ['Dewald Brevis','BAT','SA',100,42.4,172,108,'','capped_overseas',22],
+  ['Mujeeb ur Rahman','BOWL','AFG',100,0,0,0,'Mujeeb_ur_Rahman.jpg','capped_overseas',52],
+  ['Fazalhaq Farooqi','BOWL','AFG',150,0,0,0,'','capped_overseas',38],
+  ['Noor Ahmad','BOWL','AFG',150,0,0,0,'','capped_overseas',28],
+  ['Mohammad Nabi','AR','AFG',75,24.4,142,119,'Mohammad_Nabi.jpg','capped_overseas',128],
+  ['Rahmanullah Gurbaz','WK','AFG',150,42.4,168,121,'Rahmanullah_Gurbaz.jpg','capped_overseas',42],
+  ['Babar Azam','BAT','PAK',200,52.8,130,122,'Babar_Azam.jpg','capped_overseas',110],
+  ['Mohammad Rizwan','WK','PAK',150,50.4,128,104,'Mohammad_Rizwan.jpg','capped_overseas',88],
+  ['Shaheen Shah Afridi','BOWL','PAK',200,0,0,0,'Shaheen_Shah_Afridi.jpg','capped_overseas',68],
+  ['Shadab Khan','AR','PAK',100,20.4,158,86,'Shadab_Khan.jpg','capped_overseas',72],
+  ['Fakhar Zaman','BAT','PAK',75,42.6,146,193,'Fakhar_Zaman.jpg','capped_overseas',62],
+  ['Saim Ayub','BAT','PAK',100,46.2,152,113,'','capped_overseas',22],
+  ['Wanindu Hasaranga','AR','SL',200,24.4,158,66,'Wanindu_Hasaranga.jpg','capped_overseas',78],
+  ['Matheesha Pathirana','BOWL','SL',200,0,0,0,'','capped_overseas',28],
+  ['Tim David','BAT','SL',200,50.4,180,96,'Tim_David.jpg','capped_overseas',38],
+  ['Kane Williamson','BAT','NZ',75,48.2,128,148,'Kane_Williamson.jpg','capped_overseas',162],
+  ['Devon Conway','WK','NZ',75,48.4,132,99,'Devon_Conway.jpg','capped_overseas',52],
+  ['Rachin Ravindra','AR','NZ',150,46.4,152,240,'Rachin_Ravindra.jpg','capped_overseas',32],
+  ['Lockie Ferguson','BOWL','NZ',150,0,0,0,'Lockie_Ferguson.jpg','capped_overseas',52],
+  ['Kyle Jamieson','AR','NZ',100,24.4,138,74,'Kyle_Jamieson.jpg','capped_overseas',38],
+  ['Finn Allen','WK','NZ',100,36.4,168,96,'','capped_overseas',28],
+  ['Mustafizur Rahman','BOWL','BAN',100,0,0,0,'Mustafizur_Rahman.jpg','capped_overseas',72],
+  ['Shakib Al Hasan','AR','BAN',75,28.4,132,84,'Shakib_Al_Hasan.jpg','capped_overseas',235],
+  ['Sikandar Raza','AR','ZIM',40,28.4,148,121,'Sikandar_Raza.jpg','capped_overseas',82],
+
+  // ─── UNCAPPED PLAYERS ───────────────────────────────────────────
+  ['Vaibhav Suryavanshi','BAT','IN',150,42.6,170,105,'','uncapped',0],
+  ['Prabhsimran Singh','WK','IN',40,32.4,148,91,'','uncapped',0],
+  ['Shahrukh Khan','BAT','IN',40,28.4,166,78,'','uncapped',0],
+  ['Nehal Wadhera','BAT','IN',20,30.4,148,82,'','uncapped',0],
+  ['Shashank Singh','BAT','IN',20,28.4,152,68,'','uncapped',0],
+  ['Ashutosh Sharma','BAT','IN',20,32.4,156,72,'','uncapped',0],
+  ['Gurnoor Brar','AR','IN',20,20.4,138,52,'','uncapped',0],
+  ['Ramandeep Singh','AR','IN',20,22.4,148,56,'','uncapped',0],
+  ['Kamlesh Nagarkoti','BOWL','IN',20,0,0,0,'','uncapped',0],
+  ['Yash Dayal','BOWL','IN',40,0,0,0,'','uncapped',0],
+  ['Yash Thakur','BOWL','IN',20,0,0,0,'','uncapped',0],
+  ['Simarjeet Singh','BOWL','IN',20,0,0,0,'','uncapped',0],
+  ['Karn Sharma','BOWL','IN',20,0,0,0,'','uncapped',0],
+  ['Sandeep Sharma','BOWL','IN',20,0,0,0,'','uncapped',0],
+  ['Anuj Rawat','WK','IN',20,28.4,128,83,'','uncapped',0],
+  ['Siddharth Kaul','BOWL','IN',20,0,0,0,'','uncapped',0],
+  ['Nitish Rana','AR','IN',40,26.4,142,87,'','uncapped',0],
+  ['Shahbaz Ahmed','AR','IN',40,22.4,138,78,'','uncapped',0],
+  ['Rahul Tewatia','AR','IN',75,28.4,158,92,'','uncapped',0],
+  ['Tanush Kotian','AR','IN',20,18.4,118,62,'','uncapped',0],
+  ['Aryan Juyal','WK','IN',20,26.4,142,58,'','uncapped',0],
+  ['Josh Inglis','WK','AU',75,36.8,152,86,'','uncapped',0],
+  ['Matthew Short','AR','AU',75,36.4,152,93,'','uncapped',0],
+  ['Nathan Ellis','BOWL','AU',75,0,0,0,'','uncapped',0],
+  ['Sam Billings','WK','ENG',20,28.2,132,95,'','uncapped',0],
+  ['Will Jacks','AR','ENG',75,34.8,158,100,'','uncapped',0],
+  ['Tom Curran','BOWL','ENG',40,0,0,0,'','uncapped',0],
+  ['Reece Topley','BOWL','ENG',40,0,0,0,'','uncapped',0],
+  ['Evin Lewis','BAT','WI',40,30.4,162,94,'','uncapped',0],
+  ['Romario Shepherd','AR','WI',40,24.4,168,62,'','uncapped',0],
+  ['Fabian Allen','AR','WI',40,24.4,148,68,'','uncapped',0],
+  ['Gudakesh Motie','BOWL','WI',40,0,0,0,'','uncapped',0],
+  ['Akeal Hosein','BOWL','WI',40,0,0,0,'','uncapped',0],
+  ['Obed McCoy','BOWL','WI',40,0,0,0,'','uncapped',0],
+  ['Ryan Rickelton','WK','SA',100,42.4,148,129,'','uncapped',0],
+  ['Rilee Rossouw','BAT','SA',75,38.6,162,102,'','uncapped',0],
+  ['Rassie van der Dussen','BAT','SA',75,52.4,128,119,'','uncapped',0],
+  ['Gerald Coetzee','BOWL','SA',100,0,0,0,'','uncapped',0],
+  ['Tabraiz Shamsi','BOWL','SA',75,0,0,0,'','uncapped',0],
+  ['Lungi Ngidi','BOWL','SA',75,0,0,0,'','uncapped',0],
+  ['Wayne Parnell','AR','SA',40,20.4,138,62,'','uncapped',0],
+  ['Ibrahim Zadran','BAT','AFG',75,42.8,134,162,'','uncapped',0],
+  ['Azmatullah Omarzai','AR','AFG',75,28.4,148,97,'','uncapped',0],
+  ['Naveen ul Haq','BOWL','AFG',75,0,0,0,'','uncapped',0],
+  ['Gulbadin Naib','AR','AFG',20,22.4,138,61,'','uncapped',0],
+  ['Waqar Salamkheil','BOWL','AFG',40,0,0,0,'','uncapped',0],
+  ['Hazratullah Zazai','BAT','AFG',40,28.4,172,162,'','uncapped',0],
+  ['Sarfaraz Ahmed','WK','PAK',40,36.4,128,90,'Sarfaraz_Ahmed.jpg','uncapped',0],
+  ['Iftikhar Ahmed','AR','PAK',40,28.4,148,93,'','uncapped',0],
+  ['Hasan Ali','BOWL','PAK',40,0,0,0,'','uncapped',0],
+  ['Naseem Shah','BOWL','PAK',150,0,0,0,'','uncapped',0],
+  ['Charith Asalanka','BAT','SL',50,36.4,132,97,'','uncapped',0],
+  ['Pathum Nissanka','BAT','SL',50,40.2,128,178,'','uncapped',0],
+  ['Kusal Mendis','WK','SL',75,36.4,128,166,'Kusal_Mendis.jpg','uncapped',0],
+  ['Angelo Mathews','AR','SL',40,34.4,122,160,'Angelo_Mathews.jpg','uncapped',0],
+  ['Lahiru Kumara','BOWL','SL',40,0,0,0,'','uncapped',0],
+  ['Dushmantha Chameera','BOWL','SL',75,0,0,0,'','uncapped',0],
+  ['Maheesh Theekshana','BOWL','SL',75,0,0,0,'','uncapped',0],
+  ['Bhanuka Rajapaksa','WK','SL',50,36.4,148,96,'','uncapped',0],
+  ['Daryl Mitchell','AR','NZ',75,40.8,148,190,'','uncapped',0],
+  ['Glenn Phillips','AR','NZ',75,38.4,158,108,'','uncapped',0],
+  ['Mitchell Santner','AR','NZ',75,22.4,132,67,'','uncapped',0],
+  ['Matt Henry','BOWL','NZ',75,0,0,0,'','uncapped',0],
+  ['Tim Southee','BOWL','NZ',50,0,0,0,'Tim_Southee.jpg','uncapped',0],
+  ['Mushfiqur Rahim','WK','BAN',40,36.4,122,144,'Mushfiqur_Rahim.jpg','uncapped',0],
+  ['Liton Das','WK','BAN',40,36.4,132,141,'','uncapped',0],
+  ['Taskin Ahmed','BOWL','BAN',75,0,0,0,'','uncapped',0],
+  ['Mahmudullah','AR','BAN',40,28.4,128,76,'Mahmudullah.jpg','uncapped',0],
+  ['Mehidy Hasan Miraz','AR','BAN',40,24.4,124,81,'','uncapped',0],
+  ['Afif Hossain','AR','BAN',40,28.4,138,72,'','uncapped',0],
+  ['Shoriful Islam','BOWL','BAN',40,0,0,0,'','uncapped',0],
+  ['Blessing Muzarabani','BOWL','ZIM',40,0,0,0,'','uncapped',0],
+  ['Sean Williams','AR','ZIM',20,28.4,128,88,'','uncapped',0],
+  ['Paul Stirling','BAT','IRE',20,30.4,142,95,'','uncapped',0],
+  ['Lorcan Tucker','WK','IRE',20,26.4,132,88,'','uncapped',0],
+  ['Josh Little','BOWL','IRE',20,0,0,0,'','uncapped',0],
+  ['Mark Adair','AR','IRE',20,22.4,128,68,'','uncapped',0],
+
+  // ─── ACCELERATED SET (Young stars, fast-tracked) ─────────────────
+  ['Jitesh Sharma','WK','IN',40,34.8,164,49,'','accelerated',6],
+  ['Dhruv Jurel','WK','IN',40,34.2,128,77,'','accelerated',8],
+  ['Harshit Rana','BOWL','IN',75,0,0,0,'','accelerated',14],
+  ['Tilak Varma','BAT','IN',150,48.2,145,120,'','accelerated',18],
+  ['Rinku Singh','BAT','IN',150,52.1,156,67,'','accelerated',22],
+  ['Riyan Parag','AR','IN',75,34.8,158,84,'','accelerated',14],
+  ['Ravi Bishnoi','BOWL','IN',75,0,0,0,'','accelerated',32],
+  ['Jake Fraser-McGurk','BAT','AU',100,42.4,188,116,'','accelerated',12],
+  ['Cameron Green','AR','AU',200,36.4,158,121,'Cameron_Green.jpg','accelerated',38],
+  ['Harry Brook','BAT','ENG',200,52.4,158,186,'Harry_Brook.jpg','accelerated',42],
+  ['Phil Salt','WK','ENG',200,36.4,168,119,'Phil_Salt.jpg','accelerated',38],
+  ['Dewald Brevis','BAT','SA',100,42.4,172,108,'','accelerated',22],
+  ['Marco Jansen','AR','SA',150,24.4,148,48,'','accelerated',28],
+  ['Noor Ahmad','BOWL','AFG',150,0,0,0,'','accelerated',28],
+  ['Fazalhaq Farooqi','BOWL','AFG',150,0,0,0,'','accelerated',38],
+  ['Saim Ayub','BAT','PAK',100,46.2,152,113,'','accelerated',22],
+  ['Naseem Shah','BOWL','PAK',150,0,0,0,'','accelerated',38],
+  ['Matheesha Pathirana','BOWL','SL',200,0,0,0,'','accelerated',28],
+  ['Rachin Ravindra','AR','NZ',150,46.4,152,240,'Rachin_Ravindra.jpg','accelerated',32],
+  ['Vaibhav Suryavanshi','BAT','IN',150,42.6,170,105,'','accelerated',0],
+  ['Prabhsimran Singh','WK','IN',40,32.4,148,91,'','accelerated',0],
 ];
 
 const seen=new Set();
@@ -762,18 +800,38 @@ function wikiImg(filename){
   return `https://en.wikipedia.org/w/index.php?title=Special:Redirect/file/${encoded}&width=120`;
 }
 
-RAW_PLAYERS.forEach(([name,role,nat,base,bavg,bsr,bhs,wikiFile])=>{
-  if(seen.has(name))return; seen.add(name);
-  ALL_PLAYERS.push({
+// De-dupe: uncapped/accelerated overlap — keep the set with higher base
+const playerMap = new Map(); // name -> player
+RAW_PLAYERS.forEach(([name,role,nat,base,bavg,bsr,bhs,wikiFile,set,caps])=>{
+  const existing = playerMap.get(name);
+  if(existing && existing.base >= base) return; // keep higher base version
+  playerMap.set(name, {
     id:_pid++, name, role, nat, flag:FLAG[nat]||'🌍', avatar:pick(AV),
     img: wikiFile ? wikiImg(wikiFile) : '',
-    base,
+    base, set:set||'uncapped', caps:caps||0,
     batting:{avg:bavg||rnd(15,30), sr:bsr||rnd(100,140), hs:bhs||rnd(30,80)},
     bowling:{avg:role==='BOWL'?rnd(20,32):0, eco:role==='BOWL'||role==='AR'?(rnd(68,105)/10).toFixed(1):'-', wkts:role==='BOWL'?rnd(40,220):role==='AR'?rnd(10,60):0},
     status:'available', soldTo:null, soldPrice:0
   });
 });
-setTimeout(()=>{const e=document.getElementById('lobby-count');if(e)e.textContent=ALL_PLAYERS.length;},50);
+const ALL_PLAYERS_MAP = playerMap;
+ALL_PLAYERS.push(...playerMap.values());
+// Sort by set order then base price
+const SET_ORDER = ['marquee','capped_india','capped_overseas','uncapped','accelerated'];
+ALL_PLAYERS.sort((a,b)=>{
+  const si=SET_ORDER.indexOf(a.set)-SET_ORDER.indexOf(b.set);
+  if(si!==0) return si;
+  return b.base-a.base;
+});
+// Re-assign IDs after sort
+ALL_PLAYERS.forEach((p,i)=>p.id=i+1);
+setTimeout(()=>{
+  const e=document.getElementById('lobby-count');
+  if(e)e.textContent=ALL_PLAYERS.length;
+  // Show set breakdown
+  const breakdown=AUCTION_SETS.map(s=>`${s.label.split(' ')[0]} ${ALL_PLAYERS.filter(p=>p.set===s.id).length}`).join(' · ');
+  console.log('Sets:', breakdown);
+},50);
 
 // ═══════════════════════════════════════════════════════════════════
 // WEBSOCKET
@@ -832,6 +890,7 @@ let state={
   auctionChat:[], currentRpTab:'chat',
   currentPlayerIdx:-1, currentBid:0, currentBidder:null,
   myBidAmount:0, timerSecs:15, timerInterval:null, timerRunning:false,
+  currentSet:null, setsCompleted:[],
   teamBudgets:{}, teamSquads:{}, auctionRunning:false,
   bots:{}, botIQ:'smart',
 };
@@ -910,6 +969,16 @@ function handleServerMsg(msg){
     case 'AUCTION_END':
       showResults(); break;
 
+    case 'SET_CHANGE':
+      // Non-host clients: show the set intro overlay (no countdown — host drives timing)
+      if(!state.isHost){
+        const sd=AUCTION_SETS.find(s=>s.id===msg.set);
+        if(sd&&msg.set!==state.currentSet){
+          state.currentSet=msg.set;
+          showSetIntro(sd,()=>{}); // countdown just for visual, host will call player after
+        }
+      } break;
+
     case 'TIMER_TICK':
       // Non-hosts sync their display to host's countdown
       if(!state.isHost){
@@ -921,9 +990,11 @@ function handleServerMsg(msg){
       // A non-host player voted to skip this player for themselves
       handleSkipVote(msg.from, msg.playerIdx); break;
 
+    case 'RTC_OFFER': case 'RTC_ANSWER': case 'RTC_ICE':
+      handleRTCMsg(msg); break;
+
     case 'VOICE_JOIN': case 'VOICE_LEAVE': case 'VOICE_MIC':
     case 'VOICE_HAND': case 'VOICE_ADMIN_MUTE': case 'VOICE_FLOOR':
-      if(!msg.peerId) msg.peerId=voicePeerId(msg.from);
       handleVoiceMsg(msg); break;
   }
 }
@@ -1086,20 +1157,40 @@ function _enterAuction(){
 // PLAYER POOL
 // ═══════════════════════════════════════════════════════════════════
 let activeFilters=new Set();
+let activeSetFilters=new Set();
 function toggleFilter(role){activeFilters.has(role)?activeFilters.delete(role):activeFilters.add(role); renderPool();}
+function toggleSetFilter(set){activeSetFilters.has(set)?activeSetFilters.delete(set):activeSetFilters.add(set); renderPool();}
 function renderPool(){
   const q=(document.getElementById('pool-search')?.value||'').toLowerCase();
   const pool=document.getElementById('player-pool'); if(!pool) return;
+  const SET_COLORS={'marquee':'#f5c842','capped_india':'#00d4ff','capped_overseas':'#00e676','uncapped':'#a855f7','accelerated':'#ff6b35'};
+  const SET_ICONS={'marquee':'⭐','capped_india':'🇮🇳','capped_overseas':'🌍','uncapped':'🌟','accelerated':'⚡'};
   const vis=ALL_PLAYERS.filter(p=>{
     if(activeFilters.size&&!activeFilters.has(p.role)) return false;
+    if(activeSetFilters.size&&!activeSetFilters.has(p.set)) return false;
     if(q&&!p.name.toLowerCase().includes(q)) return false;
     return true;
-  }).slice(0,120);
-  pool.innerHTML=vis.map(p=>{
+  });
+  // Group by set for display
+  let grouped=[];
+  let lastSet=null;
+  vis.forEach(p=>{
+    if(p.set!==lastSet){
+      grouped.push({divider:true, set:p.set});
+      lastSet=p.set;
+    }
+    grouped.push(p);
+  });
+  pool.innerHTML=grouped.map(item=>{
+    if(item.divider){
+      const sd=AUCTION_SETS.find(s=>s.id===item.set)||{label:item.set,color:'#999'};
+      return `<div style="padding:4px 8px;margin:4px 0 2px;font-size:.6rem;font-weight:700;letter-spacing:2px;color:${sd.color};border-bottom:1px solid ${sd.color}33;text-transform:uppercase">${sd.label}</div>`;
+    }
+    const p=item;
     const cur=state.currentPlayerIdx>=0&&ALL_PLAYERS[state.currentPlayerIdx]?.id===p.id;
     const done=p.status==='sold'||p.status==='unsold';
     const avatarHtml=p.img
-      ? `<img src="${p.img}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;object-position:top" onerror="this.outerHTML='<span style=\"font-size:.9rem\">${p.flag}</span>'">`
+      ? `<img src="${p.img}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;object-position:top" onerror="this.outerHTML='<span style=font-size:.9rem>${p.flag}</span>'">`
       : `<span style="font-size:.9rem">${p.flag}</span>`;
     return `<div class="pool-player${cur?' current':''}${done?' sold':''}" onclick="hostPickPlayer(${p.id})">
       <div class="pp-avatar">${avatarHtml}</div>
@@ -1125,7 +1216,44 @@ function nextPlayer(){
   if(!state.isHost) return;
   const idx=ALL_PLAYERS.findIndex(p=>p.status==='available');
   if(idx<0){relay('AUCTION_END');showResults();return;}
-  relay('CALL_PLAYER',{playerIdx:idx}); callPlayer(idx);
+  const p=ALL_PLAYERS[idx];
+  // Check if entering a new set
+  if(p.set!==state.currentSet){
+    const newSet=AUCTION_SETS.find(s=>s.id===p.set);
+    state.currentSet=p.set;
+    // Broadcast set change to all clients
+    relay('SET_CHANGE',{set:p.set});
+    showSetIntro(newSet, ()=>{
+      relay('CALL_PLAYER',{playerIdx:idx}); callPlayer(idx);
+    });
+  } else {
+    relay('CALL_PLAYER',{playerIdx:idx}); callPlayer(idx);
+  }
+}
+
+function showSetIntro(setData, onDone){
+  if(!setData){onDone();return;}
+  const overlay=document.getElementById('set-intro');
+  const setPlayers=ALL_PLAYERS.filter(p=>p.set===setData.id&&p.status==='available');
+  document.getElementById('si-set-icon').textContent=setData.label.split(' ')[0];
+  document.getElementById('si-set-icon').style.color=setData.color;
+  document.getElementById('si-set-name').textContent=setData.label.replace(/^.\S*\s*/,'');
+  document.getElementById('si-set-name').style.color=setData.color;
+  document.getElementById('si-set-desc').textContent=setData.desc;
+  document.getElementById('si-player-count').textContent=setPlayers.length+' PLAYERS IN THIS SET';
+  overlay.style.display='flex';
+  let n=3;
+  document.getElementById('si-countdown').textContent=n;
+  const cd=setInterval(()=>{
+    n--;
+    if(n<=0){
+      clearInterval(cd);
+      overlay.style.display='none';
+      onDone();
+    } else {
+      document.getElementById('si-countdown').textContent=n;
+    }
+  },1000);
 }
 
 function callPlayer(idx){
@@ -1152,7 +1280,8 @@ function showPlayerOnStage(p){
   const card=document.getElementById('player-card');
   document.getElementById('no-player-msg').style.display='none';
   card.style.display='block'; card.classList.remove('entered','exiting');
-  document.getElementById('ps-cat').textContent=({BAT:'BATSMAN',BOWL:'BOWLER',AR:'ALL-ROUNDER',WK:'WICKET KEEPER'}[p.role]);
+  const setData=AUCTION_SETS.find(s=>s.id===p.set)||{label:'',color:'var(--muted)'};
+  document.getElementById('ps-cat').innerHTML=`<span style="color:${setData.color}">${setData.label}</span> · ${({BAT:'BATSMAN',BOWL:'BOWLER',AR:'ALL-ROUNDER',WK:'WICKET KEEPER'}[p.role])}`;
   const imgEl=document.getElementById('ps-avatar');
   if(p.img){
     imgEl.innerHTML=`<img src="${p.img}" alt="${p.name}" 
@@ -1186,6 +1315,15 @@ function showPlayerOnStage(p){
   document.getElementById('bid-amount').textContent='₹'+p.base+'L';
   document.getElementById('bt-flag').textContent='—';
   document.getElementById('bt-name').textContent='No bids';
+  // Show overseas warning if this player is overseas
+  if(isOverseas(p)&&state.isBidder){
+    const capCheck=canBidForPlayer(state.myTeam,p);
+    if(!capCheck.ok){
+      addAuctionChat('SYSTEM',`⚠️ ${p.name} is OVERSEAS — your team (${state.myTeam}) has reached the limit of ${MAX_OVERSEAS}. You cannot bid!`,'system');
+    } else if(capCheck.remaining===1){
+      addAuctionChat('SYSTEM',`⚠️ ${p.name} is OVERSEAS — you have only 1 overseas slot left!`,'system');
+    }
+  }
   requestAnimationFrame(()=>requestAnimationFrame(()=>card.classList.add('entered')));
 }
 
@@ -1217,6 +1355,14 @@ function updateTimerUI(){
 function placeBid(){
   if(!state.isBidder){showToast('Spectating','You cannot bid while spectating');return;}
   if(state.currentPlayerIdx<0) return;
+  const player=ALL_PLAYERS[state.currentPlayerIdx];
+  // Overseas cap check
+  const capCheck=canBidForPlayer(state.myTeam, player);
+  if(!capCheck.ok){
+    showToast('🚫 Overseas Full', capCheck.reason);
+    addAuctionChat('SYSTEM',`🚫 ${state.myTeam} can't bid — overseas slot full (${MAX_OVERSEAS}/${MAX_OVERSEAS})`,'system');
+    return;
+  }
   const budget=state.teamBudgets[state.myTeam]*100;
   if(state.myBidAmount>budget){showToast('Over budget!','Not enough funds');return;}
   if(state.myBidAmount<=state.currentBid){showToast('Too low!','Must beat current bid');return;}
@@ -1240,11 +1386,44 @@ function applyBid(fromId, team, amount){
 }
 
 function fmtP(v){return v>=100?'₹'+(v/100).toFixed(v%100?1:0)+'Cr':'₹'+v+'L';}
+
+const MAX_OVERSEAS = 8;
+const DOMESTIC_NATIONS = new Set(['IN']); // only Indian players are domestic
+
+function isOverseas(player){
+  return !DOMESTIC_NATIONS.has(player.nat);
+}
+
+function overseasCount(teamId){
+  return (state.teamSquads[teamId]||[]).filter(s=>s.overseas).length;
+}
+
+function canBidForPlayer(teamId, player){
+  if(!isOverseas(player)) return {ok:true};
+  const oc = overseasCount(teamId);
+  if(oc >= MAX_OVERSEAS) return {ok:false, reason:`Overseas limit reached (${MAX_OVERSEAS}/${MAX_OVERSEAS})`};
+  return {ok:true, remaining: MAX_OVERSEAS - oc};
+}
 function nextBid(c){if(c<100)return c+10; if(c<500)return c+25; if(c<1000)return c+50; return c+100;}
 function adjustBid(l){state.myBidAmount+=l; if(state.myBidAmount<state.currentBid+5)state.myBidAmount=state.currentBid+5; updateMyBidVal();}
 function updateMyBidVal(){
   document.getElementById('my-bid-val').textContent=fmtP(state.myBidAmount);
   document.getElementById('my-budget-val').textContent='₹'+state.teamBudgets[state.myTeam]+'Cr';
+  // Update overseas counter
+  const oc=overseasCount(state.myTeam);
+  const ovEl=document.getElementById('overseas-val');
+  if(ovEl){
+    ovEl.textContent=oc+'/'+MAX_OVERSEAS;
+    ovEl.style.color=oc>=MAX_OVERSEAS?'var(--red)':oc>=6?'var(--gold)':'var(--accent)';
+  }
+  // Disable bid button if current player is overseas and team is full
+  const player=state.currentPlayerIdx>=0?ALL_PLAYERS[state.currentPlayerIdx]:null;
+  const bb=document.getElementById('place-bid-btn');
+  if(bb&&player&&state.isBidder){
+    const capCheck=canBidForPlayer(state.myTeam,player);
+    bb.disabled=!capCheck.ok;
+    bb.title=capCheck.ok?(capCheck.remaining?`${capCheck.remaining} overseas slot${capCheck.remaining>1?'s':''} left`:''):'Overseas limit reached';
+  }
 }
 
 function hammer(){
@@ -1301,7 +1480,7 @@ function applySold(idx, team, price){
   const p=ALL_PLAYERS[idx]; p.status='sold'; p.soldTo=team; p.soldPrice=price;
   state.teamBudgets[team]=Math.max(0, state.teamBudgets[team]-(price/100));
   if(!state.teamSquads[team]) state.teamSquads[team]=[];
-  state.teamSquads[team].push({name:p.name, role:p.role, price});
+  state.teamSquads[team].push({name:p.name, role:p.role, price, nat:p.nat, overseas:isOverseas(p)});
   document.getElementById('ha-player').textContent=p.name;
   document.getElementById('ha-price').textContent=fmtP(price);
   const t=TEAMS.find(x=>x.id===team)||{flag:'🏏',name:team};
@@ -1376,9 +1555,13 @@ function renderTeamsPanel(){
   const b=document.getElementById('rp-body'); if(currentRpTab!=='teams') return;
   b.innerHTML=TEAMS.map(t=>{
     const sq=state.teamSquads[t.id]||[]; const budget=state.teamBudgets[t.id]||120; const isMe=t.id===state.myTeam;
+    const oc=overseasCount(t.id);
+    const ocColor=oc>=MAX_OVERSEAS?'var(--red)':oc>=6?'var(--gold)':'var(--muted)';
     return `<div class="team-row${isMe?' me':''}">
       <div class="tr-flag">${t.flag}</div>
-      <div class="tr-info"><div class="tr-name">${t.id}${isMe?' (You)':''}</div><div class="tr-stats">${sq.length} players</div></div>
+      <div class="tr-info"><div class="tr-name">${t.id}${isMe?' (You)':''}</div>
+        <div class="tr-stats">${sq.length} players · <span style="color:${ocColor}">${oc}/${MAX_OVERSEAS} overseas</span></div>
+      </div>
       <div style="text-align:right"><div class="tr-bval">₹${budget.toFixed(1)}Cr</div><div class="tr-blbl">LEFT</div></div>
     </div>`;
   }).join('');
@@ -1500,6 +1683,9 @@ function botDecide(bot,player){
   const budgetL=state.teamBudgets[bot.team]*100; const cur=state.currentBid;
   const squad=state.teamSquads[bot.team]||[]; const sqSz=squad.length;
   if(budgetL<=cur) return{bid:false};
+  // Bot overseas cap check
+  const botCapCheck=canBidForPlayer(bot.team, player);
+  if(!botCapCheck.ok) return{bid:false};
   let val=0;
   if(player.role==='BAT'||player.role==='WK') val=(player.batting.avg/60)*40+(player.batting.sr/200)*30+(player.batting.hs/264)*15;
   else if(player.role==='BOWL'){const e=parseFloat(player.bowling.eco)||8.5; val=(Math.max(0,12-e)/12)*35+(player.bowling.wkts/300)*40;}
@@ -1558,15 +1744,28 @@ function launchConfetti(){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// VOICE CHAT
+// VOICE CHAT — Native WebRTC, signaling via our own WebSocket server
+// No PeerJS, no external dependencies
 // ═══════════════════════════════════════════════════════════════════
-const voice={
-  peer:null, peerId:null, myStream:null, connections:{}, participants:{},
-  micEnabled:false, hasPermission:false, audioCtx:null, analyserNode:null,
-  volTimer:null, adminMutedPeers:new Set(),
+const voice = {
+  myStream: null,
+  micEnabled: false,
+  hasPermission: false,
+  audioCtx: null,
+  analyserNode: null,
+  volTimer: null,
+  peers: {},        // playerId -> RTCPeerConnection
+  participants: {}, // playerId -> {name, team, muted, speaking}
 };
-function voicePeerId(uid){return 'iplauc'+uid.replace(/-/g,'').slice(0,12);}
 
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ]
+};
+
+// ── Modal ──────────────────────────────────────────────────────────
 function joinVoice(){
   const m=document.getElementById('mic-modal'); if(m) m.style.display='flex';
   const s=document.getElementById('mic-status'); if(s) s.textContent='';
@@ -1575,6 +1774,7 @@ function joinVoice(){
 }
 function closeMicModal(){const m=document.getElementById('mic-modal');if(m)m.style.display='none';}
 
+// ── Get mic, wire analyser, join voice network ─────────────────────
 async function confirmMicPermission(){
   const btn=document.getElementById('mic-allow-btn');
   const status=document.getElementById('mic-status');
@@ -1582,29 +1782,38 @@ async function confirmMicPermission(){
   btn.disabled=true; btn.textContent='Requesting…';
   status.textContent='⏳ Waiting for browser permission…'; status.style.color='#f5c842';
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
     stream.getAudioTracks().forEach(t=>{t.enabled=true;});
     voice.myStream=stream; voice.hasPermission=true; voice.micEnabled=true;
+
+    // AudioContext inside gesture so it's never suspended
     voice.audioCtx=new(window.AudioContext||window.webkitAudioContext)();
     if(voice.audioCtx.state==='suspended') await voice.audioCtx.resume();
     const src=voice.audioCtx.createMediaStreamSource(stream);
     const analyser=voice.audioCtx.createAnalyser(); analyser.fftSize=512;
     src.connect(analyser); voice.analyserNode=analyser;
     startVolPoll();
-    voice.peerId=voicePeerId(state.myId);
-    voice.participants[voice.peerId]={name:state.myName,team:state.myTeam,muted:false,speaking:false};
+
+    // Register self
+    voice.participants[state.myId]={name:state.myName,team:state.myTeam,muted:false,speaking:false};
     updateMicBtn(true); renderVoiceUsers();
-    icon.textContent='✅'; status.textContent='✅ Mic ON!'; status.style.color='#00e676';
-    setTimeout(()=>{closeMicModal(); connectPeerJS();},600);
+
+    icon.textContent='✅'; status.textContent='✅ Mic ON — connecting…'; status.style.color='#00e676';
+    setTimeout(()=>{
+      closeMicModal();
+      // Tell everyone we joined voice — they will initiate calls TO us
+      relay('VOICE_JOIN',{name:state.myName, team:state.myTeam});
+    }, 600);
   }catch(err){
     icon.textContent='❌'; btn.disabled=false; btn.textContent='🎙️ TRY AGAIN';
-    if(err.name==='NotAllowedError') status.innerHTML='❌ Blocked. Click 🔒 in address bar → Microphone → Allow.';
+    if(err.name==='NotAllowedError') status.innerHTML='❌ Blocked. Click 🔒 → Microphone → Allow.';
     else if(err.name==='NotFoundError') status.innerHTML='❌ No mic found.';
     else status.textContent='❌ '+err.message;
     status.style.color='#ff4757';
   }
 }
 
+// ── Volume meter + speaking detection ─────────────────────────────
 function startVolPoll(){
   if(voice.volTimer) clearInterval(voice.volTimer);
   const buf=new Uint8Array(voice.analyserNode.frequencyBinCount);
@@ -1614,24 +1823,28 @@ function startVolPoll(){
     const avg=buf.reduce((a,b)=>a+b,0)/buf.length;
     const pct=Math.min(100,avg*2.5);
     ['wr-vol-fill','auc-vol-fill'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.width=pct+'%';});
-    const pid=voice.peerId;
-    if(pid&&voice.participants[pid]){
+    if(voice.participants[state.myId]){
       const spk=avg>10&&voice.micEnabled;
-      if(voice.participants[pid].speaking!==spk){voice.participants[pid].speaking=spk; renderVoiceUsers();}
+      if(voice.participants[state.myId].speaking!==spk){
+        voice.participants[state.myId].speaking=spk; renderVoiceUsers();
+      }
     }
   },60);
 }
 
+// ── Mic toggle ─────────────────────────────────────────────────────
 function toggleMic(){
   if(!voice.myStream||!voice.hasPermission){joinVoice();return;}
   voice.micEnabled=!voice.micEnabled;
   voice.myStream.getAudioTracks().forEach(t=>{t.enabled=voice.micEnabled;});
-  if(voice.peerId&&voice.participants[voice.peerId]){voice.participants[voice.peerId].muted=!voice.micEnabled; voice.participants[voice.peerId].speaking=false;}
+  if(voice.participants[state.myId]){
+    voice.participants[state.myId].muted=!voice.micEnabled;
+    voice.participants[state.myId].speaking=false;
+  }
   updateMicBtn(voice.micEnabled); renderVoiceUsers();
-  relay('VOICE_MIC',{muted:!voice.micEnabled, peerId:voice.peerId});
+  relay('VOICE_MIC',{muted:!voice.micEnabled});
   showHT(voice.micEnabled?'🎙️ Mic ON':'🔇 Mic muted');
 }
-
 function updateMicBtn(on){
   ['wr-mic-btn','auc-mic-btn'].forEach(id=>{
     const b=document.getElementById(id); if(!b) return;
@@ -1640,53 +1853,157 @@ function updateMicBtn(on){
   });
 }
 
-function connectPeerJS(){
-  if(typeof Peer==='undefined'||voice.peer) return;
-  const pid=voice.peerId;
-  let peer; try{peer=new Peer(pid,{debug:0});}catch(e){return;}
-  voice.peer=peer;
-  peer.on('open',id=>{relay('VOICE_JOIN',{peerId:id, name:state.myName, team:state.myTeam});});
-  peer.on('call',call=>{
-    call.answer(voice.myStream);
-    call.on('stream',s=>playRemote(call.peer,s));
-    call.on('close',()=>removeVP(call.peer));
+// ── Create WebRTC peer connection to another player ────────────────
+async function createPeerTo(targetId, isInitiator){
+  if(voice.peers[targetId]) return; // already connected
+  if(!voice.myStream){console.warn('No stream yet');return;}
+
+  const pc=new RTCPeerConnection(RTC_CONFIG);
+  voice.peers[targetId]=pc;
+
+  // Add all local tracks
+  voice.myStream.getTracks().forEach(track=>{
+    pc.addTrack(track, voice.myStream);
   });
-  peer.on('error',e=>{
-    if(e.type==='unavailable-id'){peer.destroy();voice.peer=null;voice.peerId=pid+(Math.random().toString(36)[2]);connectPeerJS();}
-  });
-  peer.on('disconnected',()=>{try{peer.reconnect();}catch(e){}});
+
+  // When remote audio arrives — play it
+  pc.ontrack=e=>{
+    const stream=e.streams[0]||new MediaStream([e.track]);
+    let el=document.getElementById('aud-'+targetId);
+    if(!el){
+      el=document.createElement('audio');
+      el.id='aud-'+targetId;
+      el.autoplay=true;
+      el.playsInline=true;
+      el.style.display='none';
+      document.body.appendChild(el);
+    }
+    if(el.srcObject!==stream) el.srcObject=stream;
+    // Detect remote speaking
+    try{
+      const ctx=voice.audioCtx||new(window.AudioContext||window.webkitAudioContext)();
+      const analyser=ctx.createAnalyser(); analyser.fftSize=256;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const buf=new Uint8Array(analyser.frequencyBinCount);
+      const poll=()=>{
+        if(!voice.participants[targetId]||!voice.peers[targetId]) return;
+        analyser.getByteFrequencyData(buf);
+        const avg=buf.reduce((a,b)=>a+b,0)/buf.length;
+        const spk=avg>8;
+        if(voice.participants[targetId].speaking!==spk){
+          voice.participants[targetId].speaking=spk; renderVoiceUsers();
+        }
+        requestAnimationFrame(poll);
+      };
+      requestAnimationFrame(poll);
+    }catch(e){console.warn('remote analyser',e);}
+  };
+
+  // ICE candidates — relay through our WS server
+  pc.onicecandidate=e=>{
+    if(e.candidate){
+      wsSend({type:'RTC_ICE', target:targetId, candidate:e.candidate});
+    }
+  };
+
+  pc.onconnectionstatechange=()=>{
+    if(pc.connectionState==='failed'||pc.connectionState==='disconnected'){
+      delete voice.peers[targetId];
+      // Retry after a moment
+      setTimeout(()=>{
+        if(voice.participants[targetId]&&!voice.peers[targetId]) createPeerTo(targetId,true);
+      },2000);
+    }
+  };
+
+  if(isInitiator){
+    // Create offer
+    const offer=await pc.createOffer({offerToReceiveAudio:true});
+    await pc.setLocalDescription(offer);
+    wsSend({type:'RTC_OFFER', target:targetId, sdp:pc.localDescription});
+  }
 }
 
-function callPeer(remotePeerId){
-  if(!voice.peer||!voice.myStream||voice.connections[remotePeerId]) return;
-  const call=voice.peer.call(remotePeerId,voice.myStream); if(!call) return;
-  voice.connections[remotePeerId]=call;
-  call.on('stream',s=>playRemote(remotePeerId,s));
-  call.on('close',()=>removeVP(remotePeerId));
+// ── Handle incoming WebRTC signaling messages ──────────────────────
+async function handleRTCMsg(msg){
+  switch(msg.type){
+
+    case 'RTC_OFFER': {
+      // Someone wants to call us — create peer, set remote, send answer
+      await createPeerTo(msg.from, false);
+      const pc=voice.peers[msg.from]; if(!pc) break;
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+      const answer=await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      wsSend({type:'RTC_ANSWER', target:msg.from, sdp:pc.localDescription});
+      break;
+    }
+
+    case 'RTC_ANSWER': {
+      const pc=voice.peers[msg.from]; if(!pc) break;
+      if(pc.signalingState!=='stable'){
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+      }
+      break;
+    }
+
+    case 'RTC_ICE': {
+      const pc=voice.peers[msg.from]; if(!pc) break;
+      try{await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));}
+      catch(e){console.warn('ICE candidate error',e);}
+      break;
+    }
+  }
 }
 
-function playRemote(peerId,stream){
-  let el=document.getElementById('aud-'+peerId);
-  if(!el){el=document.createElement('audio');el.id='aud-'+peerId;el.autoplay=true;el.style.display='none';document.body.appendChild(el);}
-  el.srcObject=stream; renderVoiceUsers();
+// ── Handle VOICE_JOIN / VOICE_LEAVE / VOICE_MIC from broadcast ─────
+function handleVoiceMsg(msg){
+  switch(msg.type){
+    case 'VOICE_JOIN':
+      // Register participant
+      if(!voice.participants[msg.from]){
+        voice.participants[msg.from]={name:msg.fromName,team:msg.fromTeam,muted:false,speaking:false};
+      }
+      // If WE have mic, call the new joiner
+      if(voice.myStream && voice.hasPermission){
+        setTimeout(()=>createPeerTo(msg.from, true), 500);
+      }
+      renderVoiceUsers();
+      addWrChat('SYSTEM','🎙️ '+msg.fromName+' joined voice','system');
+      break;
+
+    case 'VOICE_LEAVE':
+      closePeer(msg.from);
+      delete voice.participants[msg.from];
+      renderVoiceUsers(); break;
+
+    case 'VOICE_MIC':
+      if(voice.participants[msg.from]) voice.participants[msg.from].muted=msg.muted;
+      renderVoiceUsers(); break;
+  }
 }
 
-function removeVP(peerId){
-  delete voice.connections[peerId]; delete voice.participants[peerId];
-  const el=document.getElementById('aud-'+peerId); if(el) el.remove();
-  renderVoiceUsers();
+function closePeer(targetId){
+  if(voice.peers[targetId]){
+    try{voice.peers[targetId].close();}catch(e){}
+    delete voice.peers[targetId];
+  }
+  const el=document.getElementById('aud-'+targetId);
+  if(el) el.remove();
 }
 
+// ── Render voice users strip ───────────────────────────────────────
 function renderVoiceUsers(){
   ['wr-voice-users','auc-voice-users'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     const entries=Object.entries(voice.participants);
     if(!entries.length){el.innerHTML='<span style="color:var(--muted);font-size:.68rem">No voice participants</span>';return;}
     el.innerHTML=entries.map(([pid,p])=>{
-      const isMe=pid===voice.peerId; const t=TEAMS.find(x=>x.id===p.team)||{flag:'🎤'};
+      const isMe=pid===state.myId;
+      const t=TEAMS.find(x=>x.id===p.team)||{flag:'🎤'};
       return `<div class="voice-user${isMe?' me':''}${p.speaking?' speaking':''}">
         <div class="vu-dot"></div>
-        <span style="max-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.flag} ${p.name}</span>
+        <span style="max-width:65px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.flag} ${p.name}</span>
         <span>${p.muted?'🔇':'🎙️'}</span>
       </div>`;
     }).join('');
@@ -1695,24 +2012,14 @@ function renderVoiceUsers(){
   if(s){const n=Object.keys(voice.participants).length; s.textContent=n?n+' in voice':'Not connected'; s.style.color=n?'var(--green)':'var(--muted)';}
 }
 
-function handleVoiceMsg(msg){
-  switch(msg.type){
-    case 'VOICE_JOIN':
-      if(!voice.participants[msg.peerId]) voice.participants[msg.peerId]={name:msg.fromName||msg.name,team:msg.fromTeam||msg.team,muted:false,speaking:false};
-      if(voice.peer&&voice.myStream) setTimeout(()=>callPeer(msg.peerId),600);
-      renderVoiceUsers(); break;
-    case 'VOICE_LEAVE': removeVP(msg.peerId); break;
-    case 'VOICE_MIC': if(voice.participants[msg.peerId]) voice.participants[msg.peerId].muted=msg.muted; renderVoiceUsers(); break;
-  }
-}
-
-let _htTimer=null;
-function showHT(msg){const el=document.getElementById('hand-toast');if(!el)return;el.textContent=msg;el.classList.add('show');clearTimeout(_htTimer);_htTimer=setTimeout(()=>el.classList.remove('show'),2800);}
+// ── Clean up on leave ──────────────────────────────────────────────
 function leaveVoice(){
-  if(voice.peer){Object.values(voice.connections).forEach(c=>{try{c.close();}catch(e){}});try{voice.peer.destroy();}catch(e){}voice.peer=null;}
+  relay('VOICE_LEAVE',{});
+  Object.keys(voice.peers).forEach(id=>closePeer(id));
   if(voice.myStream) voice.myStream.getTracks().forEach(t=>t.stop());
   if(voice.volTimer) clearInterval(voice.volTimer);
-  voice.myStream=null; voice.micEnabled=false; voice.hasPermission=false; voice.participants={}; voice.connections={};
+  voice.myStream=null; voice.micEnabled=false; voice.hasPermission=false;
+  voice.participants={}; voice.peers={};
   updateMicBtn(false);
 }
 
