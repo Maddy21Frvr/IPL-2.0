@@ -6,7 +6,7 @@
 <title>IPL Mega Auction 2025</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#08080f;--surface:#0f0f1c;--card:#151525;--card2:#1c1c30;--border:#252540;--gold:#f5c842;--gold2:#e6a800;--accent:#00d4ff;--accent2:#0098cc;--green:#00e676;--red:#ff4757;--text:#eeeeff;--muted:#7070a0;}
+:root{--bg:#08080f;--surface:#0f0f1c;--card:#151525;--card2:#1c1c30;--border:#252540;--gold:#f5c842;--gold2:#e6a800;--accent:#00d4ff;--accent2:#0098cc;--green:#00e676;--red:#ff4757;--orange:#ff6b35;--text:#eeeeff;--muted:#7070a0;}
 *{margin:0;padding:0;box-sizing:border-box;}html,body{height:100%;overflow:hidden;}
 body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;}
 .screen{position:fixed;inset:0;display:none;flex-direction:column;overflow:hidden;}
@@ -27,6 +27,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
 .lf-label{color:var(--muted);font-size:.7rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:.2rem;}
 .lf-input{width:100%;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Barlow';font-size:.95rem;outline:none;transition:border-color .2s;}
 .lf-input:focus{border-color:var(--accent);}
+.lf-input option{background:var(--card);color:var(--text);}
 .lf-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237070a0' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer;}
 .lf-btn{padding:14px;border:none;border-radius:12px;font-family:'Bebas Neue';font-size:1.5rem;letter-spacing:3px;cursor:pointer;transition:all .2s;margin-top:.25rem;}
 .lf-btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;}
@@ -91,6 +92,8 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font
 .pool-player:hover{background:var(--surface);border-color:var(--border);}
 .pool-player.current{background:rgba(245,200,66,.1);border-color:var(--gold);}
 .pool-player.sold{opacity:.4;}
+.pool-player.locked{cursor:not-allowed;opacity:.7;}
+.pool-player.locked:hover{background:transparent;border-color:transparent;}
 .pp-avatar{width:28px;height:28px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
 .pp-name{font-weight:600;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:105px;}
 .pp-role-tag{font-size:.6rem;color:var(--muted);}
@@ -790,7 +793,6 @@ const RAW_PLAYERS=[
   ['Prabhsimran Singh','WK','IN',40,32.4,148,91,'','accelerated',0],
 ];
 
-const seen=new Set();
 const ALL_PLAYERS=[];
 let _pid=1;
 // ── Wikipedia image cache (fetched at runtime via API) ──────────────
@@ -851,7 +853,6 @@ RAW_PLAYERS.forEach(([name,role,nat,base,bavg,bsr,bhs,wikiFile,set,caps])=>{
     status:'available', soldTo:null, soldPrice:0
   });
 });
-const ALL_PLAYERS_MAP = playerMap;
 ALL_PLAYERS.push(...playerMap.values());
 // Sort by set order then base price
 const SET_ORDER = ['marquee','capped_india','capped_overseas','uncapped','accelerated'];
@@ -924,7 +925,7 @@ let state={
   myName:'', myTeam:'', roomId:'', roomName:'',
   isHost:false, isBidder:false,
   room:null,          // full room meta from server
-  auctionChat:[], currentRpTab:'chat',
+  auctionChat:[],
   currentPlayerIdx:-1, currentBid:0, currentBidder:null,
   myBidAmount:0, timerSecs:15, timerInterval:null, timerRunning:false,
   currentSet:null, setsCompleted:[],
@@ -1005,6 +1006,18 @@ function handleServerMsg(msg){
 
     case 'AUCTION_END':
       showResults(); break;
+
+    case 'TEAM_WITHDRAWN':
+      if(msg.playerIdx===state.currentPlayerIdx){
+        withdrawnTeams.add(msg.team);
+        addAuctionChat('SYSTEM',`⏱️ ${msg.team} withdrew from bidding (idle ${IDLE_SECS}s)!`,'system');
+        // If MY team was withdrawn, show a toast
+        if(msg.team===state.myTeam){
+          showToast('⏱️ Withdrawn','You were idle too long — re-bid to rejoin');
+          withdrawnTeams.delete(state.myTeam); // allow them to re-enter by bidding
+        }
+      }
+      break;
 
     case 'SET_CHANGE':
       // Non-host clients: show the set intro overlay (no countdown — host drives timing)
@@ -1236,7 +1249,8 @@ function renderPool(){
       : `<span style="font-size:.9rem">${p.flag}</span>`;
     // Start fetching if not cached
     if(!cachedImg) fetchWikiImg(p.name);
-    return `<div class="pool-player${cur?' current':''}${done?' sold':''}" onclick="hostPickPlayer(${p.id})">
+    const locked=state.currentPlayerIdx>=0&&!cur&&!done;
+    return `<div class="pool-player${cur?' current':''}${done?' sold':''}${locked?' locked':''}" onclick="hostPickPlayer(${p.id})" title="${locked?'Auction in progress — finish current player first':''}">
       <div class="pp-avatar">${avatarHtml}</div>
       <div style="flex:1;min-width:0">
         <div class="pp-name">${p.name}</div>
@@ -1248,6 +1262,11 @@ function renderPool(){
 }
 function hostPickPlayer(id){
   if(!state.isHost||!state.auctionRunning) return;
+  // LOCK: can't pick another player while one is being auctioned
+  if(state.currentPlayerIdx>=0){
+    showToast('🔒 Auction in progress','Finish the current player first');
+    return;
+  }
   const idx=ALL_PLAYERS.findIndex(p=>p.id===id);
   if(idx<0||ALL_PLAYERS[idx].status!=='available') return;
   clearTimer(); relay('CALL_PLAYER',{playerIdx:idx}); callPlayer(idx);
@@ -1304,6 +1323,7 @@ function showSetIntro(setData, onDone){
 
 function callPlayer(idx){
   skipVotes.clear();
+  resetWithdrawals();
   state.currentPlayerIdx=idx;
   const p=ALL_PLAYERS[idx];
   state.currentBid=p.base; state.currentBidder=null;
@@ -1318,6 +1338,7 @@ function callPlayer(idx){
   setTimeout(()=>{
     co.classList.remove('show');
     showPlayerOnStage(p); startTimer(); updateStats(); renderPool();
+    updateSkipBtn(); // enable skip — no bids yet
     if(state.isHost) setTimeout(scheduleBotBids,1500);
   },2200);
 }
@@ -1385,14 +1406,20 @@ function showPlayerOnStage(p){
   requestAnimationFrame(()=>requestAnimationFrame(()=>card.classList.add('entered')));
 }
 
+// ── BIDDING WAR SYSTEM ────────────────────────────────────────────
+// withdrawnTeams: teams that went idle 10s without bidding during a war
+const withdrawnTeams = new Set();
+const idleTimers = {};  // teamId -> setTimeout handle
+
+const IDLE_SECS = 10;   // seconds before a team is auto-withdrawn
+
 function startTimer(){
   clearTimer();
   state.timerSecs=15; state.timerRunning=true; updateTimerUI();
-  if(!state.isHost) return; // only host drives the countdown
+  if(!state.isHost) return;
   state.timerInterval=setInterval(()=>{
     if(!state.timerRunning){clearTimer();return;}
     state.timerSecs--; updateTimerUI();
-    // Broadcast tick so all clients stay in sync
     relay('TIMER_TICK',{secs:state.timerSecs});
     if(state.timerSecs<=0){
       clearTimer();
@@ -1402,12 +1429,61 @@ function startTimer(){
 }
 function clearTimer(){
   clearInterval(state.timerInterval); state.timerInterval=null; state.timerRunning=false;
+  // Clear all idle timers when the round ends
+  Object.values(idleTimers).forEach(t=>clearTimeout(t));
+  Object.keys(idleTimers).forEach(k=>delete idleTimers[k]);
 }
 function updateTimerUI(){
   const pct=(state.timerSecs/15)*100;
   document.getElementById('timer-fill').style.width=pct+'%';
   document.getElementById('timer-num').textContent=state.timerSecs;
   document.getElementById('timer-num').style.color=state.timerSecs<=5?'var(--red)':state.timerSecs<=8?'var(--gold)':'var(--text)';
+}
+
+// Start 10-second idle timer for a team when another team bids
+function startIdleTimer(teamId){
+  if(!state.isHost) return;
+  if(withdrawnTeams.has(teamId)) return;    // already withdrawn
+  clearTimeout(idleTimers[teamId]);
+  idleTimers[teamId]=setTimeout(()=>{
+    if(state.currentBidder===teamId) return; // they're the current high bidder — no withdraw
+    if(withdrawnTeams.has(teamId)) return;
+    withdrawTeam(teamId);
+  }, IDLE_SECS*1000);
+}
+
+function withdrawTeam(teamId){
+  if(withdrawnTeams.has(teamId)) return;
+  withdrawnTeams.add(teamId);
+  clearTimeout(idleTimers[teamId]);
+  delete idleTimers[teamId];
+  relay('TEAM_WITHDRAWN',{team:teamId, playerIdx:state.currentPlayerIdx});
+  applyWithdrawal(teamId);
+}
+
+function applyWithdrawal(teamId){
+  if(!state.isHost) return;
+  addAuctionChat('SYSTEM',`⏱️ ${teamId} has withdrawn from bidding (idle ${IDLE_SECS}s)!`,'system');
+  // Check if only 1 active bidder left → hammer immediately
+  const room = state.room;
+  const activeBidders = Object.keys(room?.bidders||{}).filter(id=>{
+    const team = room.bidders[id]?.team;
+    return team && !withdrawnTeams.has(team);
+  });
+  const activeBotTeams = Object.keys(state.bots).filter(t=>!withdrawnTeams.has(t));
+  const totalActive = activeBidders.length + activeBotTeams.length;
+
+  if(totalActive<=1 && state.currentBidder){
+    // Only one bidder left — close the auction now
+    setTimeout(()=>hammer(), 800);
+  }
+}
+
+// Called when the current player changes — reset withdrawal state
+function resetWithdrawals(){
+  withdrawnTeams.clear();
+  Object.values(idleTimers).forEach(t=>clearTimeout(t));
+  Object.keys(idleTimers).forEach(k=>delete idleTimers[k]);
 }
 
 function placeBid(){
@@ -1424,6 +1500,7 @@ function placeBid(){
   const budget=state.teamBudgets[state.myTeam]*100;
   if(state.myBidAmount>budget){showToast('Over budget!','Not enough funds');return;}
   if(state.myBidAmount<=state.currentBid){showToast('Too low!','Must beat current bid');return;}
+  withdrawnTeams.delete(state.myTeam); // rejoin if previously withdrawn
   relay('BID',{amount:state.myBidAmount, team:state.myTeam});
   applyBid(state.myId, state.myTeam, state.myBidAmount);
 }
@@ -1435,12 +1512,35 @@ function applyBid(fromId, team, amount){
   const t=TEAMS.find(x=>x.id===team)||{flag:'?'};
   document.getElementById('bt-flag').textContent=t.flag;
   document.getElementById('bt-name').textContent=team;
-  if(state.isHost){clearTimer(); startTimer();}
+
+  if(state.isHost){
+    clearTimer(); startTimer();
+    // Start idle timers for ALL other active bidder teams
+    const room=state.room;
+    const allBidderTeams=[
+      ...Object.values(room?.bidders||{}).map(p=>p.team),
+      ...Object.keys(state.bots)
+    ];
+    allBidderTeams.forEach(t2=>{
+      if(t2!==team) startIdleTimer(t2);
+    });
+  }
+
   state.myBidAmount=nextBid(amount); updateMyBidVal();
   showToast(t.flag+' '+team+' bids!', fmtP(amount));
   if(!fromId.startsWith('bot-')) addAuctionChat(team, `Bids ${fmtP(amount)} for ${ALL_PLAYERS[state.currentPlayerIdx]?.name||'player'}!`,'normal',team);
   renderTeamsPanel();
+  updateSkipBtn();
   if(state.isHost) setTimeout(scheduleBotBids,800);
+}
+
+function updateSkipBtn(){
+  const btn=document.getElementById('skip-btn');
+  if(!btn) return;
+  const bidActive=!!state.currentBidder;
+  btn.disabled=bidActive;
+  btn.title=bidActive?'Cannot skip while bidding is active':'Skip player (vote)';
+  btn.style.opacity=bidActive?'0.4':'1';
 }
 
 function fmtP(v){return v>=100?'₹'+(v/100).toFixed(v%100?1:0)+'Cr':'₹'+v+'L';}
@@ -1500,11 +1600,17 @@ function markUnsold(){
 const skipVotes = new Set(); // set of playerIds who voted skip
 
 function skipPlayer(){
+  if(state.currentPlayerIdx<0) return;
+
+  // LOCK: can't skip if active bidding is happening (someone has placed a bid)
+  if(state.currentBidder){
+    showToast('🔒 Bidding active','Cannot skip — bidding is in progress');
+    return;
+  }
+
   if(state.isHost){
-    // Host skips immediately (admin power)
     skipVotes.clear(); markUnsold(); return;
   }
-  if(state.currentPlayerIdx<0) return;
   if(skipVotes.has(state.myId)){
     showToast('Already voted','You already voted to skip'); return;
   }
@@ -1568,10 +1674,13 @@ function applyUnsold(idx){
 
 function exitStage(){
   const card=document.getElementById('player-card'); card.classList.add('exiting');
-  setTimeout(()=>{card.style.display='none'; card.classList.remove('entered','exiting');
+  setTimeout(()=>{
+    card.style.display='none'; card.classList.remove('entered','exiting');
     document.getElementById('bid-display').style.display='none';
     document.getElementById('timer-wrap').style.display='none';
-    document.getElementById('no-player-msg').style.display='block';},400);
+    document.getElementById('no-player-msg').style.display='block';
+    renderPool(); // re-render to remove locked state
+  },400);
 }
 
 function updateStats(){
