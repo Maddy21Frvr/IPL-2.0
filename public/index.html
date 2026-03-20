@@ -1028,22 +1028,35 @@ function handleServerMsg(msg){
         const tf2=TEAMS.find(t=>t.id===msg.team)||{flag:'⏱️'};
         addAuctionChat('SYSTEM',`⏱️ ${tf2.flag} ${msg.team} has WITHDRAWN — didn't respond in ${IDLE_SECS}s!`,'system');
         if(msg.team===state.myTeam){
-          showToast('⏱️ You withdrew','You were idle — another team can now bid');
+          showToast('⏱️ You withdrew','You were idle — war is over');
         }
+        // War is over — unlock all teams
+        war.leader=null; war.challenger=null;
         updateWarBanner(null,null,0);
+        updateMyBidVal(); // restore bid buttons for everyone
       }
       break;
 
     case 'WAR_UPDATE':
+      // Sync war state on non-host clients
+      war.leader=msg.leader||null;
+      war.challenger=msg.challenger||null;
       updateWarBanner(msg.leader, msg.challenger, msg.secs);
+      updateMyBidVal(); // refresh bid button lock state
       if(msg.challenger&&msg.challenger===state.myTeam){
         showToast('⚔️ YOUR TURN',`You have ${msg.secs}s to respond or you withdraw!`);
+      } else if(msg.leader&&msg.leader===state.myTeam&&msg.challenger){
+        showToast('⏳ You lead','Waiting for '+msg.challenger+' to respond…');
+      } else if(msg.leader&&msg.challenger){
+        // Third party — show locked message
+        showToast('🔒 War locked',`${msg.leader} vs ${msg.challenger} — wait your turn`);
       }
       break;
 
     case 'WAR_TICK':
+      if(msg.challenger) war.challenger=msg.challenger;
       updateWarBanner(war.leader||msg.leader||state.currentBidder, msg.challenger, msg.secs);
-      // Urgent warning for the challenged team at 5s and 3s
+      updateMyBidVal(); // keep button state in sync
       if(msg.challenger===state.myTeam){
         if(msg.secs===5) showToast('⚠️ 5 seconds!','Bid now or you withdraw!');
         if(msg.secs===3) showToast('🚨 3 seconds!','Last chance — bid or withdraw!');
@@ -1538,10 +1551,14 @@ function updateWar(newBidder){
 function onTeamWithdrawn(teamId){
   const tf=TEAMS.find(t=>t.id===teamId)||{flag:'⏱️'};
   addAuctionChat('SYSTEM',`⏱️ ${tf.flag} ${teamId} has WITHDRAWN — didn't respond in ${IDLE_SECS}s!`,'system');
-  relay('WAR_UPDATE',{leader:war.leader, challenger:null, secs:0});
+  const winningLeader=war.leader;
+  // Reset war completely — war is over
+  war.leader=null; war.challenger=null;
+  relay('TEAM_WITHDRAWN',{team:teamId, playerIdx:state.currentPlayerIdx});
   updateWarBanner(null, null, 0);
-  // No challenger left → leader wins, hammer immediately
-  if(war.leader && state.currentBidder===war.leader){
+  updateMyBidVal(); // unlock bid buttons on host
+  // Leader wins — hammer
+  if(winningLeader && state.currentBidder===winningLeader){
     setTimeout(()=>hammer(), 1000);
   }
 }
@@ -1551,6 +1568,7 @@ function resetWithdrawals(){
   clearWarTimer();
   war.leader=null; war.challenger=null;
   updateWarBanner(null,null,0);
+  updateMyBidVal(); // restore bid button state
 }
 
 // ── War banner UI ─────────────────────────────────────────────────
@@ -1580,6 +1598,27 @@ function updateWarBanner(leader, challenger, secs){
 function placeBid(){
   if(!state.isBidder){showToast('Spectating','You cannot bid while spectating');return;}
   if(state.currentPlayerIdx<0) return;
+
+  // ── WAR LOCK ──────────────────────────────────────────────────────
+  // If a bidding war is active (two teams locked in), only those two
+  // teams may bid. Everyone else is blocked until the war ends.
+  if(war.leader && war.challenger){
+    const inWar = state.myTeam===war.leader || state.myTeam===war.challenger;
+    if(!inWar){
+      const lf=TEAMS.find(t=>t.id===war.leader)||{flag:'⚔️'};
+      const cf=TEAMS.find(t=>t.id===war.challenger)||{flag:'⚔️'};
+      showToast('🔒 War in progress',`${lf.flag} ${war.leader} vs ${cf.flag} ${war.challenger} — wait for war to end`);
+      return;
+    }
+    // Only the CHALLENGER can bid right now (leader is waiting)
+    if(state.myTeam===war.leader){
+      showToast('⏳ You lead','Wait — '+war.challenger+' is deciding whether to match');
+      return;
+    }
+    // state.myTeam === war.challenger → they can bid
+  }
+  // ─────────────────────────────────────────────────────────────────
+
   const player=ALL_PLAYERS[state.currentPlayerIdx];
   // Overseas cap check
   const capCheck=canBidForPlayer(state.myTeam, player);
@@ -1656,13 +1695,50 @@ function updateMyBidVal(){
     ovEl.textContent=oc+'/'+MAX_OVERSEAS;
     ovEl.style.color=oc>=MAX_OVERSEAS?'var(--red)':oc>=6?'var(--gold)':'var(--accent)';
   }
-  // Disable bid button if current player is overseas and team is full
+  // Disable/style bid button based on all constraints
   const player=state.currentPlayerIdx>=0?ALL_PLAYERS[state.currentPlayerIdx]:null;
   const bb=document.getElementById('place-bid-btn');
-  if(bb&&player&&state.isBidder){
+  if(!bb||!state.isBidder) return;
+
+  // Check war lock
+  const warActive = war.leader && war.challenger;
+  const amLeader  = state.myTeam===war.leader;
+  const amChallenger = state.myTeam===war.challenger;
+  const lockedOut = warActive && !amLeader && !amChallenger;
+  const waitingAsLeader = warActive && amLeader;
+
+  if(lockedOut){
+    bb.disabled=true;
+    const lf=TEAMS.find(t=>t.id===war.leader)||{flag:'⚔️'};
+    const cf=TEAMS.find(t=>t.id===war.challenger)||{flag:'⚔️'};
+    bb.title=`War in progress: ${war.leader} vs ${war.challenger} — wait for it to end`;
+    bb.textContent='🔒 LOCKED';
+    bb.style.background='rgba(255,255,255,.06)';
+    bb.style.color='var(--muted)';
+    return;
+  }
+  if(waitingAsLeader){
+    bb.disabled=true;
+    bb.title='You lead — waiting for '+war.challenger+' to respond';
+    bb.textContent='⏳ WAITING…';
+    bb.style.background='rgba(245,200,66,.1)';
+    bb.style.color='var(--gold)';
+    return;
+  }
+
+  // Restore normal state
+  bb.textContent='BID 🔨';
+  bb.style.background='';
+  bb.style.color='';
+
+  // Check overseas
+  if(player){
     const capCheck=canBidForPlayer(state.myTeam,player);
     bb.disabled=!capCheck.ok;
     bb.title=capCheck.ok?(capCheck.remaining?`${capCheck.remaining} overseas slot${capCheck.remaining>1?'s':''} left`:''):'Overseas limit reached';
+  } else {
+    bb.disabled=false;
+    bb.title='';
   }
 }
 
