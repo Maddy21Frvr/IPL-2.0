@@ -1484,9 +1484,13 @@ const war = {
   teamA:     null,   // first team to bid (stays fixed for this player)
   teamB:     null,   // second team to bid (stays fixed for this player)
   waiter:    null,   // team currently waiting (just bid, other must respond)
-  active:    false,  // true once both teamA and teamB have bid
+  active:    false,  // true once BOTH teamA and teamB have bid
   idleTimer: null,
 };
+// Helper: is the war currently active and locked between two teams?
+function warLocked(){ return war.active && war.teamA && war.teamB; }
+// Helper: whose turn is it to respond?
+function warResponder(){ return war.waiter===war.teamA ? war.teamB : war.teamA; }
 const IDLE_SECS = 10;
 
 function startTimer(){
@@ -1568,14 +1572,47 @@ function updateWar(newBidder){
 function startWarCountdown(){
   clearWarTimer();
   let secsLeft = IDLE_SECS;
-  const responder = war.waiter===war.teamA ? war.teamB : war.teamA;
+  const responder = warResponder();
+  const responderBot = state.bots[responder];
+
+  // If the responder is a bot, schedule it to respond within the window
+  if(responderBot && state.isHost){
+    const player = ALL_PLAYERS[state.currentPlayerIdx];
+    const thinkMs = responderBot.personality==='aggressive' ? rnd(800,2500)
+                  : responderBot.personality==='conservative' ? rnd(4000,8000)
+                  : rnd(2000,6000);
+    // Only fire if still within the 10s window
+    if(thinkMs < IDLE_SECS*1000 - 500){
+      setTimeout(()=>{
+        // Still our war and still this bot's turn?
+        if(!warLocked()) return;
+        if(warResponder()!==responder) return;
+        if(state.currentPlayerIdx<0) return;
+        const dec = botDecide(responderBot, player);
+        if(dec.bid){
+          responderBot.lastBidRound = botRound;
+          responderBot.bidStreak++;
+          relay('BID',{amount:dec.amount, team:responder, fromName:responderBot.name, fromTeam:responder});
+          applyBid('bot-'+responder, responder, dec.amount);
+          addAuctionChat(responderBot.name, botTaunt(responderBot,dec,player),'normal',responder);
+          const bt=document.getElementById('bot-thinking');
+          const bn=document.getElementById('bot-thinking-name');
+          if(bt&&bn){bn.textContent='🤖 '+responderBot.name; bt.classList.add('show'); setTimeout(()=>bt.classList.remove('show'),1800);}
+        }
+        // If bot decides NOT to bid, let the countdown reach 0 and withdraw naturally
+      }, thinkMs);
+    }
+  }
+
   war.idleTimer = setInterval(()=>{
     secsLeft--;
     relay('WAR_TICK',{secs:secsLeft, responder, teamA:war.teamA, teamB:war.teamB, waiter:war.waiter});
     updateWarBanner(war.teamA, war.teamB, war.waiter, secsLeft);
     if(secsLeft<=0){
       clearWarTimer();
-      onTeamWithdrawn(responder);
+      // Check again — bot may have already responded and war moved on
+      if(!warLocked()) return;
+      if(warResponder()===responder) onTeamWithdrawn(responder);
     }
   }, 1000);
 }
@@ -1632,24 +1669,18 @@ function placeBid(){
 
   // ── WAR LOCK ──────────────────────────────────────────────────────
   // Once two teams are locked in a war, NO other team can bid.
-  // Only the team whose turn it is (the responder) can bid.
-  if(war.active){
+  // Only the RESPONDER (team whose turn it is) can bid.
+  if(warLocked()){
     const inWar = state.myTeam===war.teamA || state.myTeam===war.teamB;
     if(!inWar){
-      // Third team — completely locked out
-      const tA=TEAMS.find(t=>t.id===war.teamA)||{flag:'⚔️'};
-      const tB=TEAMS.find(t=>t.id===war.teamB)||{flag:'⚔️'};
-      showToast('🔒 War in progress',`${tA.flag} ${war.teamA} vs ${tB.flag} ${war.teamB} — wait for one to drop out`);
+      showToast('🔒 War in progress',`${war.teamA} vs ${war.teamB} — wait for one to drop out`);
       return;
     }
-    // In the war — check if it's actually your turn (you are the responder)
-    const responder = war.waiter===war.teamA ? war.teamB : war.teamA;
     if(state.myTeam===war.waiter){
-      // You just bid — you are the waiter, not your turn
-      showToast('⏳ You bid','Waiting for '+(responder)+' to respond…');
+      showToast('⏳ You bid','Waiting for '+warResponder()+' to respond…');
       return;
     }
-    // state.myTeam === responder → it IS your turn, fall through to bid
+    // state.myTeam === warResponder() → fall through, it IS your turn
   }
   // ─────────────────────────────────────────────────────────────────
 
@@ -1734,39 +1765,31 @@ function updateMyBidVal(){
   const bb=document.getElementById('place-bid-btn');
   if(!bb||!state.isBidder) return;
 
-  // Check war lock with new structure
-  if(war.active){
+  // War lock button state
+  if(warLocked()){
     const inWar = state.myTeam===war.teamA || state.myTeam===war.teamB;
-    const responder = war.waiter===war.teamA ? war.teamB : war.teamA;
     if(!inWar){
-      bb.disabled=true;
-      bb.textContent='🔒 WAR';
-      bb.style.background='rgba(255,255,255,.04)';
-      bb.style.color='var(--muted)';
-      bb.title=`${war.teamA} vs ${war.teamB} — wait for war to end`;
+      bb.disabled=true; bb.textContent='🔒 WAR';
+      bb.style.cssText='background:rgba(255,255,255,.04);color:var(--muted)';
+      bb.title=war.teamA+' vs '+war.teamB+' — wait for war to end';
       return;
     }
     if(state.myTeam===war.waiter){
-      bb.disabled=true;
-      bb.textContent='⏳ WAIT';
-      bb.style.background='rgba(245,200,66,.08)';
-      bb.style.color='var(--gold)';
-      bb.title='You bid — waiting for '+responder+' to respond';
+      bb.disabled=true; bb.textContent='⏳ WAIT';
+      bb.style.cssText='background:rgba(245,200,66,.08);color:var(--gold)';
+      bb.title='Waiting for '+warResponder()+' to respond';
       return;
     }
-    // It's your turn to respond — enable
-    bb.disabled=false;
-    bb.textContent='BID 🔨';
-    bb.style.background='';
-    bb.style.color='';
-    bb.title='Your turn to respond!';
+    // Your turn
+    bb.disabled=false; bb.textContent='⚔️ BID NOW';
+    bb.style.cssText='background:linear-gradient(135deg,var(--red),#c0392b);color:#fff';
+    bb.title='Your turn — respond or withdraw!';
     return;
   }
 
-  // No war — restore normal
+  // No war — normal state
   bb.textContent='BID 🔨';
-  bb.style.background='';
-  bb.style.color='';
+  bb.style.cssText='';
 
   // Check overseas
   if(player){
@@ -2028,6 +2051,14 @@ function scheduleBotBids(){
     setTimeout(()=>{
       if(state.currentPlayerIdx<0||!state.auctionRunning) return;
       if(bot.team===state.currentBidder||bot.lastBidRound===cr) return;
+
+      // ── WAR LOCK for bots ──────────────────────────────────────
+      // During open phase (war not locked): any bot can bid freely
+      // During war: bot responses are handled by startWarCountdown
+      //             scheduleBotBids should NOT fire for war participants
+      if(warLocked()) return; // war active — startWarCountdown handles bot responses
+      // ──────────────────────────────────────────────────────────
+
       const dec=botDecide(bot,player);
       if(dec.bid){
         bot.lastBidRound=cr; bot.bidStreak++;
