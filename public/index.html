@@ -2325,14 +2325,15 @@ function launchConfetti(){
 // No PeerJS, no external dependencies
 // ═══════════════════════════════════════════════════════════════════
 const voice = {
-  myStream: null,
-  micEnabled: false,
+  myStream:    null,
+  micEnabled:  false,
   hasPermission: false,
-  audioCtx: null,
+  audioCtx:    null,
   analyserNode: null,
-  volTimer: null,
-  peers: {},        // playerId -> RTCPeerConnection
-  participants: {}, // playerId -> {name, team, muted, speaking}
+  volTimer:    null,
+  peers:       {},   // playerId -> RTCPeerConnection
+  pendingIce:  {},   // playerId -> [RTCIceCandidate] queued before remote desc
+  participants:{},   // playerId -> {name, team, muted, speaking}
 };
 
 const RTC_CONFIG = {
@@ -2431,103 +2432,155 @@ function updateMicBtn(on){
 }
 
 // ── Create WebRTC peer connection to another player ────────────────
-async function createPeerTo(targetId, isInitiator){
-  if(voice.peers[targetId]) return; // already connected
-  if(!voice.myStream){console.warn('No stream yet');return;}
+// ── WebRTC peer connection ─────────────────────────────────────────
+// Fix: Only the player with the LOWER playerId initiates the offer.
+// This prevents both sides simultaneously sending offers (signaling collision).
+function shouldInitiate(remoteId){
+  return state.myId < remoteId; // lexicographic — consistent, deterministic
+}
 
-  const pc=new RTCPeerConnection(RTC_CONFIG);
-  voice.peers[targetId]=pc;
+function makePeerConnection(targetId){
+  const pc = new RTCPeerConnection(RTC_CONFIG);
+  voice.peers[targetId] = pc;
+  voice.pendingIce[targetId] = []; // queue ICE until remote desc is set
 
-  // Add all local tracks
-  voice.myStream.getTracks().forEach(track=>{
-    pc.addTrack(track, voice.myStream);
-  });
+  // Add local tracks
+  voice.myStream.getTracks().forEach(track => pc.addTrack(track, voice.myStream));
 
-  // When remote audio arrives — play it
-  pc.ontrack=e=>{
-    const stream=e.streams[0]||new MediaStream([e.track]);
-    let el=document.getElementById('aud-'+targetId);
+  // Remote audio arrives
+  pc.ontrack = e => {
+    const stream = e.streams[0] || new MediaStream([e.track]);
+    let el = document.getElementById('aud-'+targetId);
     if(!el){
-      el=document.createElement('audio');
-      el.id='aud-'+targetId;
-      el.autoplay=true;
-      el.playsInline=true;
-      el.style.display='none';
+      el = document.createElement('audio');
+      el.id = 'aud-'+targetId;
+      el.autoplay = true;
+      el.playsInline = true;
+      el.style.display = 'none';
       document.body.appendChild(el);
     }
-    if(el.srcObject!==stream) el.srcObject=stream;
-    // Detect remote speaking
+    el.srcObject = stream;
+    // Speaking detection for remote
     try{
-      const ctx=voice.audioCtx||new(window.AudioContext||window.webkitAudioContext)();
-      const analyser=ctx.createAnalyser(); analyser.fftSize=256;
-      ctx.createMediaStreamSource(stream).connect(analyser);
-      const buf=new Uint8Array(analyser.frequencyBinCount);
-      const poll=()=>{
-        if(!voice.participants[targetId]||!voice.peers[targetId]) return;
-        analyser.getByteFrequencyData(buf);
-        const avg=buf.reduce((a,b)=>a+b,0)/buf.length;
-        const spk=avg>8;
-        if(voice.participants[targetId].speaking!==spk){
-          voice.participants[targetId].speaking=spk; renderVoiceUsers();
-        }
+      const ctx = voice.audioCtx;
+      if(ctx){
+        const analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+        ctx.createMediaStreamSource(stream).connect(analyser);
+        const buf = new Uint8Array(analyser.frequencyBinCount);
+        const poll = ()=>{
+          if(!voice.participants[targetId]||!voice.peers[targetId]) return;
+          analyser.getByteFrequencyData(buf);
+          const avg = buf.reduce((a,b)=>a+b,0)/buf.length;
+          const spk = avg > 8;
+          if(voice.participants[targetId].speaking !== spk){
+            voice.participants[targetId].speaking = spk;
+            renderVoiceUsers();
+          }
+          requestAnimationFrame(poll);
+        };
         requestAnimationFrame(poll);
-      };
-      requestAnimationFrame(poll);
-    }catch(e){console.warn('remote analyser',e);}
+      }
+    }catch(e){ console.warn('remote analyser',e); }
   };
 
-  // ICE candidates — relay through our WS server
-  pc.onicecandidate=e=>{
+  // Send ICE candidates as they arrive
+  pc.onicecandidate = e => {
     if(e.candidate){
       wsSend({type:'RTC_ICE', target:targetId, candidate:e.candidate});
     }
   };
 
-  pc.onconnectionstatechange=()=>{
+  pc.onconnectionstatechange = () => {
+    console.log('RTC',targetId,'→',pc.connectionState);
+    if(pc.connectionState==='connected'){
+      console.log('✅ Voice connected to',targetId);
+    }
     if(pc.connectionState==='failed'||pc.connectionState==='disconnected'){
-      delete voice.peers[targetId];
-      // Retry after a moment
+      closePeer(targetId);
+      // Retry after 2s
       setTimeout(()=>{
-        if(voice.participants[targetId]&&!voice.peers[targetId]) createPeerTo(targetId,true);
-      },2000);
+        if(voice.participants[targetId] && !voice.peers[targetId]){
+          startPeerConnection(targetId);
+        }
+      }, 2000);
     }
   };
 
-  if(isInitiator){
-    // Create offer
-    const offer=await pc.createOffer({offerToReceiveAudio:true});
+  return pc;
+}
+
+async function startPeerConnection(targetId){
+  if(voice.peers[targetId]) return;
+  if(!voice.myStream){ console.warn('no stream'); return; }
+  if(!shouldInitiate(targetId)) return; // other side will initiate
+
+  const pc = makePeerConnection(targetId);
+  try{
+    const offer = await pc.createOffer({offerToReceiveAudio:true});
     await pc.setLocalDescription(offer);
     wsSend({type:'RTC_OFFER', target:targetId, sdp:pc.localDescription});
-  }
+  }catch(e){ console.warn('offer failed',e); closePeer(targetId); }
 }
 
 // ── Handle incoming WebRTC signaling messages ──────────────────────
 async function handleRTCMsg(msg){
+  if(!voice.myStream) return; // mic not ready yet
+
   switch(msg.type){
 
     case 'RTC_OFFER': {
-      // Someone wants to call us — create peer, set remote, send answer
-      await createPeerTo(msg.from, false);
-      const pc=voice.peers[msg.from]; if(!pc) break;
-      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-      const answer=await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      wsSend({type:'RTC_ANSWER', target:msg.from, sdp:pc.localDescription});
+      // We are the answerer (higher playerId)
+      // Create fresh peer if not already exists
+      if(!voice.peers[msg.from]){
+        makePeerConnection(msg.from);
+      }
+      const pc = voice.peers[msg.from];
+      if(!pc) break;
+      try{
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        // Flush any queued ICE candidates
+        for(const c of (voice.pendingIce[msg.from]||[])){
+          await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+        }
+        voice.pendingIce[msg.from] = [];
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        wsSend({type:'RTC_ANSWER', target:msg.from, sdp:pc.localDescription});
+      }catch(e){ console.warn('answer failed',e); }
       break;
     }
 
     case 'RTC_ANSWER': {
-      const pc=voice.peers[msg.from]; if(!pc) break;
-      if(pc.signalingState!=='stable'){
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-      }
+      const pc = voice.peers[msg.from];
+      if(!pc) break;
+      try{
+        if(pc.signalingState === 'have-local-offer'){
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+          // Flush queued ICE
+          for(const c of (voice.pendingIce[msg.from]||[])){
+            await pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+          }
+          voice.pendingIce[msg.from] = [];
+        }
+      }catch(e){ console.warn('setRemote answer failed',e); }
       break;
     }
 
     case 'RTC_ICE': {
-      const pc=voice.peers[msg.from]; if(!pc) break;
-      try{await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));}
-      catch(e){console.warn('ICE candidate error',e);}
+      const pc = voice.peers[msg.from];
+      if(!pc){
+        // Peer not created yet — queue the candidate
+        if(!voice.pendingIce[msg.from]) voice.pendingIce[msg.from]=[];
+        voice.pendingIce[msg.from].push(msg.candidate);
+        break;
+      }
+      if(pc.remoteDescription){
+        await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(()=>{});
+      } else {
+        // Queue until remote desc is set
+        if(!voice.pendingIce[msg.from]) voice.pendingIce[msg.from]=[];
+        voice.pendingIce[msg.from].push(msg.candidate);
+      }
       break;
     }
   }
@@ -2537,13 +2590,12 @@ async function handleRTCMsg(msg){
 function handleVoiceMsg(msg){
   switch(msg.type){
     case 'VOICE_JOIN':
-      // Register participant
       if(!voice.participants[msg.from]){
         voice.participants[msg.from]={name:msg.fromName,team:msg.fromTeam,muted:false,speaking:false};
       }
-      // If WE have mic, call the new joiner
+      // Only the lower-ID side initiates the peer connection
       if(voice.myStream && voice.hasPermission){
-        setTimeout(()=>createPeerTo(msg.from, true), 500);
+        setTimeout(()=>startPeerConnection(msg.from), 300);
       }
       renderVoiceUsers();
       addWrChat('SYSTEM','🎙️ '+msg.fromName+' joined voice','system');
@@ -2596,7 +2648,7 @@ function leaveVoice(){
   if(voice.myStream) voice.myStream.getTracks().forEach(t=>t.stop());
   if(voice.volTimer) clearInterval(voice.volTimer);
   voice.myStream=null; voice.micEnabled=false; voice.hasPermission=false;
-  voice.participants={}; voice.peers={};
+  voice.participants={}; voice.peers={}; voice.pendingIce={};
   updateMicBtn(false);
 }
 
